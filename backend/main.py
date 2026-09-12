@@ -7,6 +7,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from notifications import router as notifications_router
+from realtime import router as realtime_router
 
 app = FastAPI()
 
@@ -23,6 +24,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.include_router(notifications_router)
+app.include_router(realtime_router)
 
 
 @app.post("/upload-photo")
