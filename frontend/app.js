@@ -1023,6 +1023,14 @@
   }
 
   function regionFromPostcode(data) {
+    // 우편번호 서비스의 sido/sigungu 값은 주소 유형에 따라 비어 있거나 축약될 수 있다.
+    // 주소 전체에서도 먼저 앱이 알고 있는 구·군을 찾는다. (예: 서울 성북구 → 서울특별시 성북구)
+    const source = [data.sido, data.sigungu, data.roadAddress, data.jibunAddress, data.address]
+      .filter(Boolean).join(" ");
+    const bundled = L.regions().find(function (row) {
+      return source.includes(row.sigungu) && (source.includes(row.sido) || source.includes(row.sido.replace("특별시", "")) || row.sigungu === data.sigungu);
+    });
+    if (bundled) return { sido: bundled.sido, sigungu: bundled.sigungu };
     return data.sido && data.sigungu ? { sido: data.sido, sigungu: data.sigungu } : null;
   }
 
