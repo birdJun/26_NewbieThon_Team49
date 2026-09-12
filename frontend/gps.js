@@ -9,3 +9,4 @@ btn.addEventListener("click", function() {
     console.error("위치 가져오기 실패:", error);
   });
 });
+

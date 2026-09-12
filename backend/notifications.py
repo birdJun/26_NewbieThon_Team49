@@ -13,3 +13,8 @@ def create_notification(message: str):
 @router.get("/notifications")
 def get_notifications():
     return {"data": notifications}
+
+@router.delete("/notifications")
+def clear_notifications():
+    notifications.clear()
+    return {"status": "cleared"}
