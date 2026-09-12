@@ -8,3 +8,5 @@ pydantic-settings
 bcrypt
 PyJWT
 APScheduler
+pytest
+httpx2

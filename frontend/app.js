@@ -10,7 +10,10 @@
   const app = document.getElementById("app");
   const L = window.BiumLookup, S = window.BiumStore;
   const kakaoConfig = window.BIUM_KAKAO || {};
-  const API_BASE = window.BIUM_API_BASE || "/api/v1";
+  const isLocalStaticServer = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    && window.location.port !== "8000";
+  const API_BASE = window.BIUM_API_BASE
+    || (isLocalStaticServer ? "http://127.0.0.1:8000/api/v1" : "/api/v1");
 
   const state = {
     screen: "login",
@@ -157,8 +160,12 @@
         + (d.zonecode ? '<span>' + esc(d.zonecode) + '</span>' : '') + '</div><button class="btn ghost small" data-act="search-address">다시 검색</button></div></div>'
         + '<div class="field"><label for="home-address-detail">상세 주소 <span style="font-weight:400;color:var(--ink-3)">(선택)</span></label>'
         + '<input id="home-address-detail" autocomplete="address-line2" enterkeyhint="done" placeholder="예) 101동 1203호" value="' + esc(d.detailAddress || '') + '"></div>'
-      : '<div class="field"><label>집 주소</label><button class="address-search" data-act="search-address">' + I.search(18)
-        + '<span><strong>주소 검색</strong><small>도로명, 건물명 또는 지번으로 찾기</small></span>' + I.chevR(17) + '</button></div>';
+      : '<div class="field"><label for="home-address-input">집 주소</label><input id="home-address-input" data-act="home-address" autocomplete="street-address" placeholder="도로명 또는 지번 주소를 입력하세요" value="' + esc(d.addr || "") + '">'
+        + '<button class="address-search" data-act="search-address">' + I.search(18)
+        + '<span><strong>주소 검색</strong><small>검색 서비스가 열리지 않으면 주소를 직접 입력할 수 있어요</small></span>' + I.chevR(17) + '</button></div>'
+        + '<div class="field"><label for="home-region">지역</label><select id="home-region" data-act="home-region"><option value="">수수료 기준 지역을 선택하세요</option>'
+        + L.regions().map(r => '<option value="' + esc(r.sido + "|" + r.sigungu) + '"' + (d.sigungu === r.sigungu && d.sido === r.sido ? ' selected' : '') + '>' + esc(r.sido + " " + r.sigungu) + '</option>').join("")
+        + '</select></div>';
     return (state.addressEdit ? topbar("집 주소 변경") : '') + '<main class="screen" style="padding-top:' + (state.addressEdit ? '18px' : '42px') + ';gap:22px"><div style="display:grid;gap:7px"><span class="eyebrow" style="color:var(--pine)">내 동네 설정</span>'
       + '<h2 class="title">집 주소를 등록해주세요</h2><p class="lede">입력한 주소는 내 배출 기록과 동네 기준을 설정할 때만 사용해요.</p></div>'
       + selected
@@ -814,6 +821,26 @@
     }
   }
 
+  async function restoreSession() {
+    const saved = S.auth();
+    const token = S.token();
+    if (!saved || !token) {
+      state.screen = "login";
+      render();
+      return;
+    }
+    try {
+      const me = await api("/auth/me", { headers: { "Authorization": "Bearer " + token } });
+      if (String(saved.id) !== String(me.id)) throw new Error("저장된 로그인 정보가 만료되었습니다.");
+      routeAfterAuth();
+    } catch (err) {
+      S.logout();
+      state.authError = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
+      state.screen = "login";
+      render();
+    }
+  }
+
   function startKakaoLogin() {
     const key = kakaoConfig.javascriptKey;
     const redirectUri = kakaoConfig.redirectUri || window.location.origin + window.location.pathname;
@@ -905,7 +932,7 @@
 
   function saveHomeAddress() {
     const d = state.draftProfile;
-    const base = (d.roadAddress || d.addr || "").trim();
+    const base = (d.roadAddress || d.addr || (document.getElementById("home-address-input") || {}).value || "").trim();
     const detail = ((document.getElementById("home-address-detail") || {}).value || "").trim();
     if (!base) {
       state.addressError = "주소 검색으로 집 주소를 선택해주세요."; render(); return;
@@ -1033,6 +1060,11 @@
       return;
     }
     if (e.target.dataset.act === "ob-addr") { state.draftProfile.addr = e.target.value; return; }
+    if (e.target.dataset.act === "home-address") {
+      state.draftProfile.addr = e.target.value;
+      state.draftProfile.roadAddress = "";
+      return;
+    }
     if (e.target.dataset.act === "ob-name" || e.target.dataset.act === "search") {
       const key = e.target.dataset.act;
       if (key === "ob-name") state.draftProfile.nickname = e.target.value;
@@ -1067,6 +1099,13 @@
         if (e.target.dataset.act === "share-edit-photo") state.shareActionError = err.message || "사진을 불러오지 못했어요.";
         else state.shareFormError = err.message || "사진을 불러오지 못했어요.";
       }
+      render();
+      return;
+    }
+    if (e.target.dataset.act === "home-region") {
+      const parts = e.target.value.split("|");
+      state.draftProfile.sido = parts[0] || "";
+      state.draftProfile.sigungu = parts[1] || "";
       render();
       return;
     }
@@ -1175,6 +1214,6 @@
   } else if (!S.auth()) {
     state.screen = "login"; render();
   } else {
-    routeAfterAuth();
+    restoreSession();
   }
 })();
