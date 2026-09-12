@@ -22,7 +22,11 @@ def create_waste_fee_engine(url: str):
     return engine
 
 
-waste_fee_engine = create_waste_fee_engine(os.getenv("DATABASE_URL") or "sqlite:///" + (Path(__file__).resolve().parents[1] / "waste_fee.db").as_posix())
+waste_fee_engine = create_waste_fee_engine(
+    os.getenv("WASTE_FEE_DATABASE_URL")
+    or "sqlite:///"
+    + (Path(__file__).resolve().parents[1] / "waste_fee.db").as_posix()
+)
 WasteFeeSession = sessionmaker(waste_fee_engine)
 
 

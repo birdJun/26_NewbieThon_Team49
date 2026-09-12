@@ -7,6 +7,8 @@ from app.core.database import Base, engine
 from app.modules.core_trade.router import router as core_router
 from app.modules.device.router import UPLOAD_DIR, router as device_router
 from app.modules.core_trade.scheduler import shutdown_scheduler, start_scheduler
+from app.waste_fee_db.app.waste_fee_api import waste_fee_router
+from app.waste_fee_db.app.waste_fee_db import restore_waste_fee_db, waste_fee_engine
 import logging
 
 # 콘솔에 INFO 레벨 이상의 로그를 모두 출력하도록 설정
@@ -20,6 +22,12 @@ async def lifespan(app: FastAPI):
     # 1. 시작 시 DB 테이블 자동 생성
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # 대형폐기물 수수료 DB가 없는 최초 실행 시 마이그레이션/시드로 생성
+    if waste_fee_engine.dialect.name == "sqlite":
+        waste_fee_db_path = Path(waste_fee_engine.url.database)
+        if not waste_fee_db_path.exists():
+            restore_waste_fee_db()
 
     # 2. 백그라운드 만료 체크 스케줄러 가동
     start_scheduler()
@@ -51,6 +59,7 @@ app.add_middleware(
 
 app.include_router(core_router, prefix="/api/v1")
 app.include_router(device_router)
+app.include_router(waste_fee_router)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.get("/health")
