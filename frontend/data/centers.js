@@ -1,18 +1,16 @@
 // 재활용센터 / 중고매입처
-// 담당: C  ·  verified:false 인 항목은 앱에서 '번호 확인 중'으로 표시되고 전화 버튼이 잠긴다.
-//   → 실제 상호·주소·전화번호를 확인해서 채우고 verified:true 로 바꿀 것 (마감 16:30)
-//   찾는 법: 지자체 홈페이지 '재활용센터' 검색, 또는 네이버지도에서 '<동네이름> 재활용센터'
+// 지자체 공식 안내 또는 전국재활용센터표준데이터에서 확인한 정보다.
 window.BIUM_CENTERS = [
-  { sido: "서울특별시", sigungu: "관악구", name: "관악구 재활용센터", addr: "관악구 (주소 확인 필요)",
-    tel: "", buys: ["가구", "가전"], verified: false },
-  { sido: "서울특별시", sigungu: "관악구", name: "중고가구 매입점", addr: "관악구 (주소 확인 필요)",
-    tel: "", buys: ["가구"], verified: false },
-  { sido: "서울특별시", sigungu: "성북구", name: "성북구 재활용센터", addr: "성북구 (주소 확인 필요)",
-    tel: "", buys: ["가구", "가전"], verified: false },
-  { sido: "경기도", sigungu: "수원시", name: "수원시 재활용센터", addr: "수원시 (주소 확인 필요)",
-    tel: "", buys: ["가구", "가전"], verified: false },
-  { sido: "부산광역시", sigungu: "부산진구", name: "부산진구 재활용센터", addr: "부산진구 (주소 확인 필요)",
-    tel: "", buys: ["가구", "가전"], verified: false }
+  { sido: "서울특별시", sigungu: "관악구", name: "관악구 재활용센터 봉천점", addr: "서울특별시 관악구 남부순환로 1663",
+    tel: "02-883-0858", buys: ["가구", "가전", "기타"], verified: true },
+  { sido: "서울특별시", sigungu: "관악구", name: "관악구 재활용센터 신림점", addr: "서울특별시 관악구 남부순환로 1494",
+    tel: "02-842-8425", buys: ["가구", "가전", "기타"], verified: true },
+  { sido: "서울특별시", sigungu: "성북구", name: "성북구 재활용센터", addr: "서울특별시 성북구 화랑로 146",
+    tel: "02-943-8272", buys: ["가구", "가전"], verified: true },
+  { sido: "경기도", sigungu: "수원시", name: "수원시 자원순환센터", addr: "경기도 수원시 영통구 광교호수로 278-1",
+    tel: "031-888-7911", buys: ["기타"], verified: true },
+  { sido: "부산광역시", sigungu: "부산진구", name: "부산진구 재활용센터", addr: "부산광역시 부산진구 신천대로 155",
+    tel: "051-805-8272", buys: ["가구", "생활용품"], verified: true }
 ];
 
 // 전국 공통 창구 — 아래 두 건은 공개된 공식 제도라 지역과 무관하게 항상 노출된다.
