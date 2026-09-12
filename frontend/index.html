@@ -7,11 +7,13 @@
 <body>
   <h1>카메라 & GPS 테스트</h1>
 
-  <input type="file" accept="image/*" capture="environment" id="photoInput">
+  <input type="file" accept="image/*" capture="environment" id="photoInput"> # 사진 선택 입력창
+  <p id="uploadResult"></p> # 업로드 결과 
+  <div id="uploadedFiles"></div> # 업로드 파일 목록
 
   <br><br>
 
-  <button id="locationBtn">현재 위치 가져오기</button>
+  <button id="locationBtn">현재 위치 가져오기</button> # GPS 버튼
   <p id="result"></p>
 
   <script src="camera.js"></script>

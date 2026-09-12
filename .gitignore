@@ -26,3 +26,8 @@ yarn-debug.log*
 yarn-error.log*
 logs/
 *.log
+
+# Python runtime files and local uploads
+__pycache__/
+*.py[cod]
+backend/uploads/
