@@ -1236,16 +1236,12 @@
   });
 
   /* 검색창 입력 */
-  app.addEventListener("compositionstart", function (e) {
-    if (e.target.dataset.act === "ob-name") state.composingNickname = true;
-  });
-
-  app.addEventListener("compositionend", function (e) {
-    if (e.target.dataset.act !== "ob-name") return;
-    state.composingNickname = false;
-    state.draftProfile.nickname = e.target.value;
-    render();
-  });
+  // 한글 IME 조합 중 render()가 실행되면 input 노드가 교체되어 자모가 끊긴다.
+  // 닉네임은 상태와 시작 버튼만 직접 갱신하고, 입력 중에는 화면을 다시 그리지 않는다.
+  function syncOnboardingSubmit() {
+    const submit = app.querySelector('[data-act="ob-submit"]');
+    if (submit) submit.disabled = !(state.draftProfile.nickname || "").trim() || !state.draftProfile.sigungu;
+  }
 
   app.addEventListener("input", function (e) {
     if (e.target.dataset.act === "share-search") {
@@ -1259,11 +1255,14 @@
       state.draftProfile.roadAddress = "";
       return;
     }
-    if (e.target.dataset.act === "ob-name" || e.target.dataset.act === "search") {
+    if (e.target.dataset.act === "ob-name") {
+      state.draftProfile.nickname = e.target.value;
+      syncOnboardingSubmit();
+      return;
+    }
+    if (e.target.dataset.act === "search") {
       const key = e.target.dataset.act;
-      if (key === "ob-name") state.draftProfile.nickname = e.target.value;
-      else state.q = e.target.value.trim();
-      if (key === "ob-name" && (e.isComposing || state.composingNickname)) return;
+      state.q = e.target.value.trim();
       const pos = e.target.selectionStart;
       render();
       const next = app.querySelector('[data-act="' + key + '"]');
