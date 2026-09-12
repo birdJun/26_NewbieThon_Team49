@@ -826,6 +826,25 @@
 
   const feeNorm = value => String(value || "").replace(/[\s·()]/g, "").toLowerCase();
 
+  function feeSpecScore(selectedSpec, rowSpec) {
+    const selected = feeNorm(selectedSpec);
+    const candidate = feeNorm(rowSpec);
+    if (!selected || !candidate) return 0;
+    if (selected === candidate) return 1000;
+    if (candidate.includes(selected) || selected.includes(candidate)) return 700;
+
+    const aliases = {
+      "싱글": ["싱글", "1인용"],
+      "슈퍼싱글": ["슈퍼싱글", "1인용"],
+      "퀸이상": ["퀸", "킹", "2인용", "대형"],
+      "토퍼얇은것": ["토퍼", "라텍스", "얇은", "얇음"]
+    };
+    const words = aliases[selected] || selected.match(/[가-힣a-z]+|\d+(?:\.\d+)?/g) || [];
+    return words.reduce(function (score, word, index) {
+      return candidate.includes(feeNorm(word)) ? score + Math.max(80, 300 - index * 40) : score;
+    }, 0);
+  }
+
   function goToOfficialFeePicker() {
     state.actualFee = null;
     state.feeOptions = [];
@@ -866,12 +885,15 @@
       const bestItemScore = Math.max.apply(null, rows.map(itemScore));
       const matches = rows.filter(row => itemScore(row) === bestItemScore && bestItemScore > 0);
       if (!matches.length) throw new Error("선택한 품목과 일치하는 구청 수수료 기준을 찾지 못했어요.");
-      state.feeOptions = matches.map(function (row) {
+      state.feeOptions = matches.map(function (row, index) {
         return {
           id: String(row.id), itemName: row.item_name, spec: row.size_label,
           amount: row.amount_krw, raw: row.fee_raw,
-          org: row.managing_organization, referenceDate: row.reference_date
+          org: row.managing_organization, referenceDate: row.reference_date,
+          specScore: feeSpecScore(state.draft.spec, row.size_label), sourceOrder: index
         };
+      }).sort(function (a, b) {
+        return b.specScore - a.specScore || a.sourceOrder - b.sourceOrder;
       });
     } catch (err) {
       state.feeOptions = [];
