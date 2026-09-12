@@ -60,6 +60,32 @@
     "중구", "성동구", "광진구", "마포구", "용산구", "영등포구", "동작구", "강서구", "양천구",
     "구로구", "금천구", "관악구", "서초구", "강남구", "송파구", "강동구"
   ];
+  const INFO_METROS = ["서울특별시", "부산광역시", "대구광역시", "인천광역시", "광주광역시", "대전광역시", "울산광역시"];
+  const INFO_PROVINCES = ["경기도", "강원특별자치도", "충청북도", "충청남도", "전북특별자치도", "전라남도", "경상북도", "경상남도"];
+  const INFO_SHORT_NAMES = {
+    "서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천",
+    "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산", "경기도": "경기",
+    "강원특별자치도": "강원", "충청북도": "충북", "충청남도": "충남", "전북특별자치도": "전북",
+    "전라남도": "전남", "경상북도": "경북", "경상남도": "경남"
+  };
+
+  function selectedInfoRegion() {
+    return S.infoRegion() || state.region || { sido: "서울특별시", sigungu: "관악구" };
+  }
+
+  function infoRegions() {
+    return L.regions();
+  }
+
+  function infoTopRegions() {
+    return INFO_METROS.map(sido => ({ sido, type: "metro" }))
+      .concat(INFO_PROVINCES.map(sido => ({ sido, type: "province" })));
+  }
+
+  function infoChildren(sido) {
+    if (sido === "서울특별시") return SEOUL_DISTRICTS.map(sigungu => ({ sido, sigungu }));
+    return infoRegions().filter(region => region.sido === sido);
+  }
 
   function ago(ts) {
     const m = Math.floor((Date.now() - ts) / 60000);
@@ -181,7 +207,9 @@
         + '<div class="field"><label for="home-address-detail">상세 주소 <span style="font-weight:400;color:var(--ink-3)">(선택)</span></label>'
         + '<input id="home-address-detail" autocomplete="address-line2" enterkeyhint="done" placeholder="예) 101동 1203호" value="' + esc(d.detailAddress || '') + '"></div>'
       : '<div class="field"><label>집 주소</label><button class="address-search" data-act="search-address"' + (state.addressBusy ? ' disabled' : '') + '>' + I.search(18)
-        + '<span><strong>' + (state.addressBusy ? '수수료 데이터 확인 중...' : '주소 검색') + '</strong><small>도로명, 건물명 또는 지번으로 찾기</small></span>' + I.chevR(17) + '</button></div>';
+        + '<span><strong>' + (state.addressBusy ? '수수료 데이터 확인 중...' : '주소 검색') + '</strong><small>도로명, 건물명 또는 지번으로 찾기</small></span>' + I.chevR(17) + '</button>'
+        + '<input id="home-address-input" data-act="home-address" autocomplete="street-address" placeholder="또는 주소를 직접 입력하세요" value="' + esc(d.addr || '') + '"' + (state.addressBusy ? ' disabled' : '') + '>'
+        + '<button class="location-button" data-act="current-location"' + (state.locationBusy ? ' disabled' : '') + '>' + I.pin(18) + '<span>' + (state.locationBusy ? '현재 위치를 확인하는 중...' : '현재 위치로 주소 찾기') + '</span></button></div>';
     const currentAddress = state.addressEdit && d.currentAddress
       ? '<div class="notice"><span>' + I.home(15) + '</span><span>현재 등록 주소<br><strong>' + esc(d.currentAddress) + '</strong></span></div>' : '';
     return (state.addressEdit ? topbar("집 주소 변경") : '') + '<main class="screen" style="padding-top:' + (state.addressEdit ? '18px' : '42px') + ';gap:22px"><div style="display:grid;gap:7px"><span class="eyebrow" style="color:var(--pine)">내 동네 설정</span>'
@@ -189,7 +217,7 @@
       + currentAddress
       + selected
       + (state.addressError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.addressError) + '</span></div>' : '')
-      + '<div style="flex:1"></div><button class="btn" data-act="save-address">내 주소로 계속하기</button></main>';
+      + '<div style="flex:1"></div><button class="btn" data-act="save-address">확인</button></main>';
   };
 
   /* 0 · 온보딩 — 처음 켰을 때 딱 한 번. 닉네임 + 동네를 받는다.
@@ -260,17 +288,22 @@
   };
 
   screens.info = function () {
-    const selected = state.infoDistrict || (state.region && state.region.sido === "서울특별시" ? state.region.sigungu : "관악구");
-    const result = districtFeeCache.get(selected);
-    const loading = state.infoFeeLoading || (!result && !state.infoFeeError);
+    const infoRegion = selectedInfoRegion();
+    const selected = infoRegion.sigungu;
+    const isSeoul = infoRegion.sido === "서울특별시";
+    const result = districtFeeCache.get(infoRegion.sido + "|" + selected);
+    const loading = isSeoul && (state.infoFeeLoading || (!result && !state.infoFeeError));
     const supported = !loading && !state.infoFeeError && result && result.total > 0;
-    const status = loading ? '조회 중' : state.infoFeeError ? '조회 실패' : supported ? '데이터 있음' : '자료 없음';
+    const status = !isSeoul ? '업데이트 예정' : loading ? '조회 중' : state.infoFeeError ? '조회 실패' : supported ? '데이터 있음' : '자료 없음';
     const map = SEOUL_DISTRICTS.map(d => '<button class="district ' + (d === selected ? 'selected ' : '') + (supported && d === selected ? 'available' : '') + '" data-act="info-district" data-district="' + d + '" aria-label="' + d + ' 선택">' + (d.endsWith("구") ? d.slice(0, -1) : d) + '</button>').join("");
-    return '<header class="topbar"><h1>서울시 생활 정보</h1></header><main class="screen info-screen">'
-      + '<div><span class="eyebrow">WASTE GUIDE · SEOUL</span><h2 class="title">우리 구 처리 정보를 확인하세요</h2><p class="lede">구를 선택하면 공공데이터에 등록된 수수료 정보를 보여드려요.</p></div>'
-      + '<section class="seoul-map" aria-label="서울시 자치구 선택"><div class="map-label">서울특별시</div><div class="district-grid">' + map + '</div></section>'
-      + '<section class="district-summary" aria-live="polite"><div class="row-between"><div><span class="eyebrow">선택한 지역</span><h3 class="sub">서울특별시 ' + selected + '</h3></div><span class="info-status ' + (supported ? 'ready' : '') + '">' + status + '</span></div>'
-      + (loading ? '<div class="notice"><span class="spinner"></span><span>수수료 자료를 조회하고 있습니다.</span></div>'
+    const regionPicker = '<button class="info-region-picker" data-act="info-change-region"><span>' + I.pin(17) + '<span><small>지역</small><strong>' + esc(infoRegion.sido + " " + selected) + '</strong></span></span>' + I.chevD(16) + '</button>';
+    return '<header class="topbar"><h1>' + esc(infoRegion.sido) + ' 생활 정보</h1></header><main class="screen info-screen">'
+      + '<div><span class="eyebrow">WASTE GUIDE · LOCAL</span><h2 class="title">우리 지역 처리 정보를 확인하세요</h2><p class="lede">지역을 선택하면 해당 지역의 폐기물 처리 정보를 확인할 수 있어요.</p></div>'
+      + regionPicker
+      + (isSeoul ? '<section class="seoul-map" aria-label="서울시 자치구 선택"><div class="map-label">서울특별시</div><div class="district-grid">' + map + '</div></section>' : '')
+      + '<section class="district-summary" aria-live="polite"><div class="row-between"><div><span class="eyebrow">선택한 지역</span><h3 class="sub">' + esc(infoRegion.sido + ' ' + selected) + '</h3></div><span class="info-status ' + (supported ? 'ready' : '') + '">' + status + '</span></div>'
+      + (!isSeoul ? '<div class="notice info-coming"><span>' + I.info(15) + '</span><span><strong>' + esc(infoRegion.sido) + ' ' + esc(selected) + ' 정보는 업데이트 예정입니다.</strong><br>현재는 서울시 생활정보를 먼저 제공하고 있어요. 지역을 바꾸면 선택한 지역이 계속 유지됩니다.</span></div>'
+      : loading ? '<div class="notice"><span class="spinner"></span><span>수수료 자료를 조회하고 있습니다.</span></div>'
         : state.infoFeeError ? '<div class="notice error"><span>' + esc(state.infoFeeError) + '</span></div><button class="btn ghost" data-act="info-retry">다시 조회</button>'
         : supported
         ? '<div class="info-stats"><div><strong>' + result.itemCount + '</strong><span>품목</span></div><div><strong>' + result.total + '</strong><span>등록 항목</span></div><div><strong>' + won(result.lowest) + '</strong><span>최저 등록 수수료</span></div></div>'
@@ -279,14 +312,15 @@
           + '<div class="notice"><span>' + I.truck(15) + '</span><span>대형폐기물은 구청 신고 후 지정 장소에 배출하세요. 정확한 금액과 접수 방법은 <strong>' + selected + '청</strong> 공지를 기준으로 확인합니다.</span></div>'
           + '<a class="btn ghost" href="' + esc(municipalDisposalUrl({ sido: "서울특별시", sigungu: selected })) + '" target="_blank" rel="noopener">' + I.chevR(17) + selected + ' 배출 신청 안내</a>'
         : '<div class="notice"><span>' + I.info(15) + '</span><span>현재 등록된 공공데이터에 이 구의 자료가 없습니다. 수수료가 없다는 뜻은 아닙니다.</span></div><a class="btn ghost" href="' + esc(municipalDisposalUrl({ sido: "서울특별시", sigungu: selected })) + '" target="_blank" rel="noopener">구청 배출 안내 확인</a>')
-      + (supported ? '<button class="btn" data-act="go" data-to="infoFeeSearch">품목별 수수료 검색 ' + I.chevR(17) + '</button>' : '')
+        + (isSeoul && supported ? '<button class="btn" data-act="go" data-to="infoFeeSearch">품목별 수수료 검색 ' + I.chevR(17) + '</button>' : '')
       + '</section>'
       + '</main>' + tabs("info");
   };
 
   screens.infoFeeSearch = function () {
-    const selected = state.infoDistrict || (state.region && state.region.sido === '서울특별시' ? state.region.sigungu : '관악구');
-    const result = districtFeeCache.get(selected);
+    const infoRegion = selectedInfoRegion();
+    const selected = infoRegion.sigungu;
+    const result = districtFeeCache.get(infoRegion.sido + "|" + selected);
     return topbar('품목별 수수료 검색') + '<main class="screen">'
       + '<h2 class="sub">서울특별시 ' + esc(selected) + '</h2>'
       + (result && result.total > 0
@@ -312,7 +346,8 @@
   }
 
   function updateInfoFeeResults() {
-    const selected = state.infoDistrict || (state.region && state.region.sido === '서울특별시' ? state.region.sigungu : '관악구');
+    const infoRegion = selectedInfoRegion();
+    const selected = infoRegion.sido + "|" + infoRegion.sigungu;
     const target = document.getElementById('info-fee-results');
     const result = districtFeeCache.get(selected);
     if (target && result) target.innerHTML = infoFeeResultsHTML(result);
@@ -759,8 +794,24 @@
 
   /* ── 바텀시트: 지역 선택 ──────────────────────────────── */
   function sheetHTML() {
-    if (state.sheet !== "region") return "";
-    const rs = L.regions();
+    if (state.sheet !== "region" && state.sheet !== "info-region") return "";
+    const rs = infoRegions();
+    if (state.sheet === "info-region") {
+      const selected = selectedInfoRegion();
+      const province = state.infoProvinceChoice;
+      if (!province) {
+        return '<div class="sheet-backdrop" data-act="close-sheet"><div class="sheet" role="dialog" aria-label="광역시와 도 선택">'
+          + '<h3 class="sub">지역</h3><p class="lede" style="font-size:12.5px">도·특별시·광역시를 먼저 선택하세요.</p>'
+          + '<div class="info-region-grid">' + infoTopRegions().map(region => '<button class="card" data-act="info-set-province" data-sido="' + esc(region.sido) + '"><span class="body"><h4>' + esc(INFO_SHORT_NAMES[region.sido] || region.sido) + '</h4><p>' + (region.type === 'province' ? '시 선택' : '구 선택') + '</p></span></button>').join("") + '</div>'
+          + '<button class="btn ghost" data-act="close-sheet">닫기</button></div></div>';
+      }
+      const selectableRegions = infoChildren(province);
+      return '<div class="sheet-backdrop" data-act="close-sheet"><div class="sheet" role="dialog" aria-label="정보 지역 선택">'
+        + '<button class="text-btn" data-act="info-back-province">← 지역 다시 선택</button><h3 class="sub">' + esc(province) + ' ' + (INFO_PROVINCES.includes(province) ? '시' : '구') + ' 선택</h3>'
+        + '<p class="lede" style="font-size:12.5px">' + (INFO_PROVINCES.includes(province) ? '시를 선택하세요.' : '구를 선택하세요.') + '</p>'
+        + '<div class="list">' + selectableRegions.map(r => '<button class="card" data-act="info-set-region" data-sido="' + esc(r.sido) + '" data-sigungu="' + esc(r.sigungu) + '"><span class="body"><h4>' + esc(r.sido + ' ' + r.sigungu) + '</h4><p>' + (r.sido === '서울특별시' ? '생활정보 제공' : '업데이트 예정') + '</p></span>' + (r.sido === selected.sido && r.sigungu === selected.sigungu ? '<span class="info-status ready">선택됨</span>' : '') + '</button>').join("") + '</div>'
+        + '<button class="btn ghost" data-act="close-sheet">닫기</button></div></div>';
+    }
     return '<div class="sheet-backdrop" data-act="close-sheet"><div class="sheet" role="dialog" aria-label="지역 선택">'
       + '<h3 class="sub">지역을 고르세요</h3>'
       + '<p class="lede" style="font-size:12.5px">수수료 데이터가 있는 지역만 보입니다.</p>'
@@ -776,10 +827,16 @@
   let districtFeeRequest = 0;
 
   async function loadDistrictFees(force) {
-    const selected = state.infoDistrict || (state.region && state.region.sido === '서울특별시' ? state.region.sigungu : '관악구');
+    const infoRegion = selectedInfoRegion();
+    const cacheKey = infoRegion.sido + "|" + infoRegion.sigungu;
+    if (infoRegion.sido !== '서울특별시') {
+      state.infoFeeLoading = false;
+      state.infoFeeError = '';
+      return;
+    }
     const requestId = ++districtFeeRequest;
     state.infoFeeError = '';
-    if (!force && districtFeeCache.has(selected)) {
+    if (!force && districtFeeCache.has(cacheKey)) {
       state.infoFeeLoading = false;
       render();
       return;
@@ -787,8 +844,8 @@
     state.infoFeeLoading = true;
     render();
     try {
-      const summary = await window.BiumDistrictFees.load(api, selected);
-      districtFeeCache.set(selected, summary);
+      const summary = await window.BiumDistrictFees.load(api, infoRegion.sido, infoRegion.sigungu);
+      districtFeeCache.set(cacheKey, summary);
     } catch (error) {
       if (requestId === districtFeeRequest) state.infoFeeError = error.message || '수수료 정보를 불러오지 못했습니다.';
     } finally {
@@ -1204,17 +1261,31 @@
     }).open();
   }
 
-  function saveHomeAddress() {
+  async function saveHomeAddress() {
     const d = state.draftProfile;
     const base = (d.roadAddress || d.addr || "").trim();
     const detail = ((document.getElementById("home-address-detail") || {}).value || "").trim();
     if (!base) {
       state.addressError = "주소 검색으로 집 주소를 선택해주세요."; render(); return;
     }
-    const region = d.regionVerified && d.sigungu ? { sido: d.sido, sigungu: d.sigungu } : null;
+    let region = d.regionVerified && d.sigungu ? { sido: d.sido, sigungu: d.sigungu } : regionFromAddress(base);
     if (!region) {
-      state.addressError = "주소 검색 후, 수수료 데이터가 있는 지역인지 확인해주세요.";
+      state.addressError = "주소에서 지원하는 시·군·구를 찾지 못했어요. 주소를 더 정확히 입력해주세요.";
       render(); return;
+    }
+    if (!d.regionVerified) {
+      state.addressBusy = true;
+      state.addressError = "입력한 지역의 수수료 데이터를 확인하는 중...";
+      render();
+      try {
+        region = await verifyWasteFeeRegion(region);
+        if (!region) throw new Error("입력한 지역의 대형폐기물 수수료 데이터가 아직 준비되지 않았어요.");
+      } catch (err) {
+        state.addressBusy = false;
+        state.addressError = err.message || "입력한 주소를 확인하지 못했어요.";
+        render(); return;
+      }
+      state.addressBusy = false;
     }
     const address = [base, detail].filter(Boolean).join(" ");
     d.addr = address;
@@ -1256,6 +1327,7 @@
           state.draftProfile.roadAddress = result.address;
           state.draftProfile.sido = region.sido;
           state.draftProfile.sigungu = region.sigungu;
+          state.draftProfile.regionVerified = true;
           state.addressError = "";
         }
       } catch (err) {
@@ -1343,9 +1415,28 @@
         if (state.screen === "info") loadDistrictFees();
         break;
       case "info-district":
-        state.infoDistrict = el.dataset.district;
         state.infoFeeLimit = 20;
+        S.setInfoRegion({ sido: "서울특별시", sigungu: el.dataset.district });
         loadDistrictFees(); break;
+      case "info-change-region":
+        state.infoProvinceChoice = null;
+        state.sheet = "info-region";
+        render(); break;
+      case "info-set-province":
+        state.infoProvinceChoice = el.dataset.sido;
+        render(); break;
+      case "info-back-province":
+        state.infoProvinceChoice = null;
+        render(); break;
+      case "info-set-region":
+        S.setInfoRegion({ sido: el.dataset.sido, sigungu: el.dataset.sigungu });
+        state.infoFeeError = "";
+        state.infoFeeLimit = 20;
+        state.infoProvinceChoice = null;
+        state.sheet = null;
+        render();
+        if (el.dataset.sido === "서울특별시") loadDistrictFees();
+        break;
       case "info-fee-more":
         state.infoFeeLimit = (state.infoFeeLimit || 20) + 20;
         updateInfoFeeResults(); break;
@@ -1432,6 +1523,7 @@
     if (e.target.dataset.act === "home-address") {
       state.draftProfile.addr = e.target.value;
       state.draftProfile.roadAddress = "";
+      state.draftProfile.regionVerified = false;
       return;
     }
     if (e.target.dataset.act === "ob-name") {

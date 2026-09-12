@@ -444,6 +444,19 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 
 .info-screen { gap: 15px; }
 .info-screen > div:first-child { display: grid; gap: 5px; }
+.info-region-picker { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); text-align: left; }
+.info-region-picker > span { display: flex; align-items: center; gap: 9px; }
+.info-region-picker svg { color: var(--pine); flex: none; }
+.info-region-picker > svg { color: var(--ink-3); }
+.info-region-picker small, .info-region-picker strong { display: block; }
+.info-region-picker small { color: var(--ink-3); font-size: 10.5px; }
+.info-region-picker strong { margin-top: 2px; font-size: 14px; }
+.info-coming { background: #f6f2e9; border-color: #eadfca; }
+.info-region-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.info-region-grid .card { min-height: 68px; padding: 9px 6px; text-align: center; }
+.info-region-grid .body { display: grid; gap: 3px; }
+.info-region-grid h4 { font-size: 12px; line-height: 1.25; word-break: keep-all; }
+.info-region-grid p { font-size: 10px; color: var(--ink-3); }
 .seoul-map { padding: 15px; border: 1px solid var(--line); border-radius: var(--radius); background: #eef3f1; }
 .map-label { margin-bottom: 11px; color: var(--pine-ink); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
 .district-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }

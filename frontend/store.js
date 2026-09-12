@@ -3,7 +3,7 @@
                  화면 코드는 이 함수들만 부르므로 app.js 는 손댈 필요 없음. */
 window.BiumStore = (function () {
   const K = { posts: "bium.posts.v1", records: "bium.records.v1", region: "bium.region.v1",
-              profile: "bium.profile.v1", auth: "bium.auth.v1", token: "bium.token.v1", intro: "bium.intro.v1" };
+              infoRegion: "bium.info-region.v1", profile: "bium.profile.v1", auth: "bium.auth.v1", token: "bium.token.v1", intro: "bium.intro.v1" };
 
   function read(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
@@ -74,6 +74,8 @@ window.BiumStore = (function () {
         || { sido: "서울특별시", sigungu: "관악구" };
   }
   function setRegion(r) { write(K.region, r); }
+  function infoRegion() { return read(K.infoRegion, null); }
+  function setInfoRegion(r) { write(K.infoRegion, r); }
 
   /* 배출번호: 월일 + 네자리. 실제 구청 번호 체계와는 무관한 우리 앱의 접수번호다.
      TODO(B): 발표 때 "실제 구청 시스템 연동 시 구청 발급번호로 대체" 라고 언급할 것 */
@@ -103,6 +105,6 @@ window.BiumStore = (function () {
   function setSeenIntro() { write(K.intro, true); }
   function logout() { localStorage.removeItem(K.profile); localStorage.removeItem(K.auth); localStorage.removeItem(K.token); }
 
-  return { posts, addPost, setPostStatus, records, addRecord, region, setRegion, issueNumber, reset,
+  return { posts, addPost, setPostStatus, records, addRecord, region, setRegion, infoRegion, setInfoRegion, issueNumber, reset,
            profile, saveProfile, clearProfile, auth, token, setToken, login, hasSeenIntro, setSeenIntro, logout };
 })();

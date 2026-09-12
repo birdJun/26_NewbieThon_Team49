@@ -1,12 +1,16 @@
 /* 생활 정보 화면 전용: 같은 자료 버전의 전체 페이지를 읽어 요약한다. */
 window.BiumDistrictFees = (function () {
-  async function load(request, district) {
+  async function load(request, province, district) {
+    if (district === undefined) {
+      district = province;
+      province = '서울특별시';
+    }
     const rows = [];
     let dataset = null;
     let total = null;
     const seen = new Set();
     do {
-      const params = new URLSearchParams({ province: '서울특별시', district, limit: '100', offset: String(rows.length) });
+      const params = new URLSearchParams({ province, district, limit: '100', offset: String(rows.length) });
       if (dataset) params.set('import_id', dataset.id);
       const page = await request('/waste-fees?' + params);
       if (!page.dataset || !Number.isInteger(page.total) || page.total < 0 || !Array.isArray(page.items)) throw new Error('수수료 응답 형식을 확인할 수 없습니다.');
@@ -15,7 +19,7 @@ window.BiumDistrictFees = (function () {
       total = page.total;
       if (page.items.length === 0 && rows.length < total) throw new Error('일부 수수료 자료를 불러오지 못했습니다.');
       for (const row of page.items) {
-        if (row.province !== '서울특별시' || row.district !== district || seen.has(row.id)) throw new Error('지역 또는 페이지 정보가 일치하지 않습니다.');
+        if (row.province !== province || row.district !== district || seen.has(row.id)) throw new Error('지역 또는 페이지 정보가 일치하지 않습니다.');
         seen.add(row.id);
         rows.push(row);
       }
