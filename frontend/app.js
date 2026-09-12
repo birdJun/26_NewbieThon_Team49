@@ -257,22 +257,62 @@
 
   screens.info = function () {
     const selected = state.infoDistrict || (state.region && state.region.sido === "서울특별시" ? state.region.sigungu : "관악구");
-    const rows = (window.BIUM_FEES || []).filter(r => r.sido === "서울특별시" && r.sigungu === selected);
-    const items = Array.from(new Set(rows.map(r => r.item)));
-    const lowest = rows.length ? rows.reduce((min, row) => Math.min(min, Number(row.fee)), Infinity) : null;
-    const supported = rows.length > 0;
+    const result = districtFeeCache.get(selected);
+    const loading = state.infoFeeLoading || (!result && !state.infoFeeError);
+    const supported = !loading && !state.infoFeeError && result && result.total > 0;
+    const status = loading ? '조회 중' : state.infoFeeError ? '조회 실패' : supported ? '데이터 있음' : '자료 없음';
     const map = SEOUL_DISTRICTS.map(d => '<button class="district ' + (d === selected ? 'selected ' : '') + (supported && d === selected ? 'available' : '') + '" data-act="info-district" data-district="' + d + '" aria-label="' + d + ' 선택">' + (d.endsWith("구") ? d.slice(0, -1) : d) + '</button>').join("");
     return '<header class="topbar"><h1>서울시 생활 정보</h1></header><main class="screen info-screen">'
-      + '<div><span class="eyebrow">WASTE GUIDE · SEOUL</span><h2 class="title">우리 구 처리 정보를 확인하세요</h2><p class="lede">지도를 눌러 구를 선택하면 등록된 대형폐기물 수수료와 처리 기준을 보여드려요.</p></div>'
+      + '<div><span class="eyebrow">WASTE GUIDE · SEOUL</span><h2 class="title">우리 구 처리 정보를 확인하세요</h2><p class="lede">구를 선택하면 공공데이터에 등록된 수수료 정보를 보여드려요.</p></div>'
       + '<section class="seoul-map" aria-label="서울시 자치구 선택"><div class="map-label">서울특별시</div><div class="district-grid">' + map + '</div></section>'
-      + '<section class="district-summary"><div class="row-between"><div><span class="eyebrow">선택한 지역</span><h3 class="sub">서울특별시 ' + selected + '</h3></div><span class="info-status ' + (supported ? 'ready' : '') + '">' + (supported ? '데이터 있음' : '준비 중') + '</span></div>'
-      + (supported
-        ? '<div class="info-stats"><div><strong>' + items.length + '</strong><span>품목</span></div><div><strong>' + rows.length + '</strong><span>규격 기준</span></div><div><strong>' + won(lowest) + '</strong><span>최저 수수료</span></div></div>'
+      + '<section class="district-summary" aria-live="polite"><div class="row-between"><div><span class="eyebrow">선택한 지역</span><h3 class="sub">서울특별시 ' + selected + '</h3></div><span class="info-status ' + (supported ? 'ready' : '') + '">' + status + '</span></div>'
+      + (loading ? '<div class="notice"><span class="spinner"></span><span>수수료 자료를 조회하고 있습니다.</span></div>'
+        : state.infoFeeError ? '<div class="notice error"><span>' + esc(state.infoFeeError) + '</span></div><button class="btn ghost" data-act="info-retry">다시 조회</button>'
+        : supported
+        ? '<div class="info-stats"><div><strong>' + result.itemCount + '</strong><span>품목</span></div><div><strong>' + result.total + '</strong><span>등록 항목</span></div><div><strong>' + won(result.lowest) + '</strong><span>최저 등록 수수료</span></div></div>'
+          + '<p class="lede">데이터기준일: ' + esc(result.dates.join(', ') || '정보 없음') + '</p>'
+          + (result.specCount < result.total ? '<div class="notice"><span>규격 정보가 없는 항목이 ' + (result.total - result.specCount) + '건 있습니다. 개별 물품의 요금은 구청 안내에서 확인해주세요.</span></div>' : '')
           + '<div class="notice"><span>' + I.truck(15) + '</span><span>대형폐기물은 구청 신고 후 지정 장소에 배출하세요. 정확한 금액과 접수 방법은 <strong>' + selected + '청</strong> 공지를 기준으로 확인합니다.</span></div>'
           + '<a class="btn ghost" href="' + esc(municipalDisposalUrl({ sido: "서울특별시", sigungu: selected })) + '" target="_blank" rel="noopener">' + I.chevR(17) + selected + ' 배출 신청 안내</a>'
-        : '<div class="notice"><span>' + I.info(15) + '</span><span>현재 이 구의 수수료 데이터는 준비 중입니다. 다른 구를 선택하거나 관할 구청에서 직접 확인해 주세요.</span></div>')
-      + '</section></main>' + tabs("info");
+        : '<div class="notice"><span>' + I.info(15) + '</span><span>현재 등록된 공공데이터에 이 구의 자료가 없습니다. 수수료가 없다는 뜻은 아닙니다.</span></div><a class="btn ghost" href="' + esc(municipalDisposalUrl({ sido: "서울특별시", sigungu: selected })) + '" target="_blank" rel="noopener">구청 배출 안내 확인</a>')
+      + (supported ? '<button class="btn" data-act="go" data-to="infoFeeSearch">품목별 수수료 검색 ' + I.chevR(17) + '</button>' : '')
+      + '</section>'
+      + '</main>' + tabs("info");
   };
+
+  screens.infoFeeSearch = function () {
+    const selected = state.infoDistrict || (state.region && state.region.sido === '서울특별시' ? state.region.sigungu : '관악구');
+    const result = districtFeeCache.get(selected);
+    return topbar('품목별 수수료 검색') + '<main class="screen">'
+      + '<h2 class="sub">서울특별시 ' + esc(selected) + '</h2>'
+      + (result && result.total > 0
+        ? '<div class="field"><label for="info-fee-query">품목 또는 규격 검색</label><input id="info-fee-query" type="search" data-act="info-fee-query" placeholder="예: 의자, 침대, 2인용" value="' + esc(state.infoFeeQuery || '') + '"></div>'
+          + '<div id="info-fee-results">' + infoFeeResultsHTML(result) + '</div>'
+        : '<p class="empty">조회할 자료가 없습니다. 뒤로 돌아가 지역을 선택해주세요.</p>')
+      + '</main>';
+  };
+
+  function infoFeeResultsHTML(result) {
+    const normalize = value => String(value || '').normalize('NFKC').toLocaleLowerCase('ko').replace(/\s+/g, '');
+    const query = normalize(state.infoFeeQuery);
+    const rows = result.rows.filter(row => normalize(row.item_name + ' ' + (row.size_label || '')).includes(query));
+    const limit = state.infoFeeLimit || 20;
+    return '<p class="lede" role="status">검색 결과 ' + rows.length + '건</p>'
+      + (rows.length ? '<div class="list">' + rows.slice(0, limit).map(row =>
+        '<article class="card"><div class="body"><h4>' + esc(row.item_name) + '</h4><p>규격: '
+        + esc(row.size_label || '규격 정보 없음') + '</p><p>수수료: <strong>'
+        + (Number.isInteger(row.amount_krw) && row.amount_krw >= 0 ? won(row.amount_krw) : esc(row.fee_raw || '구청 확인 필요'))
+        + '</strong></p></div></article>').join('') + '</div>'
+        : '<p class="empty">일치하는 품목이 없습니다. 다른 품목명이나 규격으로 검색해주세요.</p>')
+      + (rows.length > limit ? '<button class="btn ghost" data-act="info-fee-more">더 보기 (' + Math.min(limit, rows.length) + '/' + rows.length + ')</button>' : '');
+  }
+
+  function updateInfoFeeResults() {
+    const selected = state.infoDistrict || (state.region && state.region.sido === '서울특별시' ? state.region.sigungu : '관악구');
+    const target = document.getElementById('info-fee-results');
+    const result = districtFeeCache.get(selected);
+    if (target && result) target.innerHTML = infoFeeResultsHTML(result);
+  }
 
   /* 2 · 사진으로 찾기 */
   screens.camera = function () {
@@ -718,6 +758,33 @@
   }
 
   /* ── 렌더 & 이동 ──────────────────────────────────────── */
+  const districtFeeCache = new Map();
+  let districtFeeRequest = 0;
+
+  async function loadDistrictFees(force) {
+    const selected = state.infoDistrict || (state.region && state.region.sido === '서울특별시' ? state.region.sigungu : '관악구');
+    const requestId = ++districtFeeRequest;
+    state.infoFeeError = '';
+    if (!force && districtFeeCache.has(selected)) {
+      state.infoFeeLoading = false;
+      render();
+      return;
+    }
+    state.infoFeeLoading = true;
+    render();
+    try {
+      const summary = await window.BiumDistrictFees.load(api, selected);
+      districtFeeCache.set(selected, summary);
+    } catch (error) {
+      if (requestId === districtFeeRequest) state.infoFeeError = error.message || '수수료 정보를 불러오지 못했습니다.';
+    } finally {
+      if (requestId === districtFeeRequest) {
+        state.infoFeeLoading = false;
+        if (state.screen === 'info') render();
+      }
+    }
+  }
+
   function render() {
     app.innerHTML = (screens[state.screen] || screens.home)() + sheetHTML();
     app.scrollTop = 0;
@@ -728,12 +795,14 @@
     if (!opts.replace) state.stack.push(state.screen);
     state.screen = name;
     render();
+    if (name === 'info') loadDistrictFees();
   }
 
   function back() {
     if (state.screen === "address" && state.addressEdit) state.addressEdit = false;
     state.screen = state.stack.pop() || "home";
     render();
+    if (state.screen === 'info') loadDistrictFees();
   }
 
   async function api(path, options) {
@@ -1189,10 +1258,16 @@
         state.screen = { home: "home", info: "info", share: "shareList", activity: "myShares", me: "me" }[el.dataset.tab];
         render();
         if (state.screen === "home" || state.screen === "shareList" || state.screen === "myShares") loadShareItems();
+        if (state.screen === "info") loadDistrictFees();
         break;
       case "info-district":
         state.infoDistrict = el.dataset.district;
-        render(); break;
+        state.infoFeeLimit = 20;
+        loadDistrictFees(); break;
+      case "info-fee-more":
+        state.infoFeeLimit = (state.infoFeeLimit || 20) + 20;
+        updateInfoFeeResults(); break;
+      case "info-retry": loadDistrictFees(true); break;
 
       case "sheet":       state.sheet = el.dataset.sheet; render(); break;
       case "close-sheet": if (e.target === el) { state.sheet = null; render(); } break;
@@ -1248,6 +1323,12 @@
   });
 
   app.addEventListener("input", function (e) {
+    if (e.target.dataset.act === "info-fee-query") {
+      state.infoFeeQuery = e.target.value;
+      state.infoFeeLimit = 20;
+      updateInfoFeeResults();
+      return;
+    }
     if (e.target.dataset.act === "share-search") {
       state.shareQuery = e.target.value;
       updateShareGrid();
@@ -1399,9 +1480,35 @@
   }
 
   function municipalDisposalUrl(region) {
-    const known = { "관악구": "https://smartclean.gwanak.go.kr/" };
-    return known[region.sigungu] || "https://www.google.com/search?q="
-      + encodeURIComponent(region.sigungu + " 대형폐기물 배출 신청");
+    const seoulDistrictWasteSites = {
+      "도봉구": "https://smartclean.dobong.go.kr/",
+      "노원구": "https://smartclean.nowon.kr/",
+      "강북구": "https://www.gangbuk.go.kr/www/contents.do?key=8652",
+      "은평구": "https://smartclean.ep.go.kr/",
+      "성북구": "https://smartclean.sb.go.kr/",
+      "중랑구": "https://smartclean-jungnang.kr/",
+      "종로구": "https://www.jongno.go.kr/wasteMain.do",
+      "동대문구": "https://www.ddm.go.kr/www/contents.do?key=597",
+      "서대문구": "https://www.sdm.go.kr/environment/contents/waste.do",
+      "중구": "https://www.junggu.seoul.kr/content.do?cmsid=14192",
+      "성동구": "https://www.sd.go.kr/main/contents.do?key=1479",
+      "광진구": "https://smartclean-gwangjin.kr/",
+      "마포구": "https://smartclean.mapo.go.kr/",
+      "용산구": "https://www.yongsan.go.kr/portal/main/contents.do?menuNo=200579",
+      "영등포구": "https://smartclean.ydp.go.kr/",
+      "동작구": "https://smartclean.dongjak.go.kr/",
+      "강서구": "https://www.gangseo.seoul.kr/reserve/recycle/main",
+      "양천구": "https://smartclean.yangcheon.go.kr/",
+      "구로구": "https://www.guro.go.kr/www/contents.do?key=2720",
+      "금천구": "https://smartclean.geumcheon.go.kr/",
+      "관악구": "https://smartclean.gwanak.go.kr/",
+      "서초구": "https://www.seocho.go.kr/site/seocho/04/10407020000002015070710.jsp",
+      "강남구": "https://clean.gangnam.go.kr/",
+      "송파구": "https://smartclean.songpa.go.kr/",
+      "강동구": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_008_001"
+    };
+    return seoulDistrictWasteSites[region.sigungu]
+      || "https://news.seoul.go.kr/env/archives/518262";
   }
 
   /* ── 시작 ─────────────────────────────────────────────── */
