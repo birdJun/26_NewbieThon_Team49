@@ -124,6 +124,15 @@ async def reserve_item(
     return await service.reserve_item(db, item_id, current_user.id)
 
 
+@router.delete("/items/{item_id}/reservation", response_model=ItemResponse, tags=["Items"])
+async def cancel_reservation(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ItemResponse:
+    return await service.cancel_reservation(db, item_id, current_user.id)
+
+
 @router.patch("/items/{item_id}", response_model=ItemResponse, tags=["Items"])
 async def update_item(
     item_id: int,

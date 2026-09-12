@@ -22,6 +22,10 @@ async def lifespan(app: FastAPI):
     # 1. 시작 시 DB 테이블 자동 생성
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        columns = await conn.exec_driver_sql("PRAGMA table_info(items)")
+        existing_columns = {row[1] for row in columns.fetchall()}
+        if "reserved_by_id" not in existing_columns:
+            await conn.exec_driver_sql("ALTER TABLE items ADD COLUMN reserved_by_id INTEGER REFERENCES users(id)")
 
     # 2. 대형폐기물 수수료 DB가 없는 최초 실행 때만 시드에서 복원한다.
     #    이미 있는 DB는 절대 덮어쓰지 않는다.

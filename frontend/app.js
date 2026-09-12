@@ -702,6 +702,9 @@
     if (item.status === "AVAILABLE" && !mine) {
       action += '<button class="btn" data-act="reserve-share"' + (state.shareActionBusy ? ' disabled' : '') + '>'
         + (state.shareActionBusy ? '예약하는 중...' : '가져갈게요') + '</button>';
+    } else if (item.status === "RESERVED" && item.reservedById === Number((S.auth() || {}).id)) {
+      action += '<button class="btn ghost" data-act="cancel-reservation"' + (state.shareActionBusy ? ' disabled' : '') + '>'
+        + (state.shareActionBusy ? '취소하는 중...' : '예약 취소') + '</button>';
     } else if (item.status === "RESERVED" && mine) {
       action += '<button class="btn" data-act="complete-share"' + (state.shareActionBusy ? ' disabled' : '') + '>'
         + (state.shareActionBusy ? '처리 중...' : '나눔 완료로 표시') + '</button>';
@@ -988,7 +991,7 @@
       state.shareItems = items.map(function (item) {
         return {
           id: item.id, sellerId: item.seller_id, title: item.title, description: item.description || "", imageUrl: item.image_url,
-          locationName: item.location_name || "", status: item.status,
+          locationName: item.location_name || "", status: item.status, reservedById: item.reserved_by_id,
           registeredAt: serverTimestamp(item.registered_at), expiresAt: serverTimestamp(item.expires_at)
         };
       });
@@ -1009,6 +1012,8 @@
     try {
       if (status === "RESERVED") {
         await api("/items/" + item.id + "/reserve", { method: "POST", headers: authHeaders() });
+      } else if (status === "AVAILABLE" && item.status === "RESERVED") {
+        await api("/items/" + item.id + "/reservation", { method: "DELETE", headers: authHeaders() });
       } else {
         await api("/items/" + item.id + "/status", {
           method: "PATCH", headers: authHeaders(), body: JSON.stringify({ status: status })
@@ -1407,6 +1412,7 @@
         go("shareDetail");
         break;
       case "reserve-share": updateShareStatus("RESERVED"); break;
+      case "cancel-reservation": updateShareStatus("AVAILABLE"); break;
       case "complete-share": updateShareStatus("COMPLETED"); break;
       case "edit-share": beginShareEdit(); break;
       case "save-share-edit": saveShareEdit(); break;

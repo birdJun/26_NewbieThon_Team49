@@ -137,6 +137,26 @@ async def reserve_item(
     )
 
   item.status = ItemStatus.RESERVED
+  item.reserved_by_id = current_user_id
+  await db.commit()
+  await db.refresh(item)
+  return ItemResponse.model_validate(item)
+
+
+async def cancel_reservation(
+    db: AsyncSession, item_id: int, current_user_id: int
+) -> ItemResponse:
+  result = await db.execute(select(Item).where(Item.id == item_id))
+  item = result.scalar_one_or_none()
+  if not item:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="해당 물품을 찾을 수 없습니다.")
+  if item.reserved_by_id != current_user_id:
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="예약을 취소할 권한이 없습니다.")
+  if item.status != ItemStatus.RESERVED:
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="현재 예약 상태가 아닙니다.")
+
+  item.status = ItemStatus.AVAILABLE
+  item.reserved_by_id = None
   await db.commit()
   await db.refresh(item)
   return ItemResponse.model_validate(item)

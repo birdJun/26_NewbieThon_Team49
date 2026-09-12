@@ -46,6 +46,7 @@ class ItemStatusUpdateRequest(BaseModel):
 class ItemResponse(BaseModel):
   id: int
   seller_id: int
+  reserved_by_id: Optional[int] = None
   title: str
   description: str
   price: int

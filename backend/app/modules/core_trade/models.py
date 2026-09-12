@@ -29,9 +29,6 @@ class User(Base):
       nullable=False,
   )
 
-  items: Mapped[List["Item"]] = relationship(
-      "Item", back_populates="seller", cascade="all, delete-orphan"
-  )
 
 
 class ItemStatus(str, enum.Enum):
@@ -48,6 +45,9 @@ class Item(Base):
   id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
   seller_id: Mapped[int] = mapped_column(
       Integer, ForeignKey("users.id"), nullable=False
+  )
+  reserved_by_id: Mapped[Optional[int]] = mapped_column(
+      Integer, ForeignKey("users.id"), nullable=True
   )
 
   title: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -74,4 +74,3 @@ class Item(Base):
       Boolean, default=False, nullable=False
   )
 
-  seller: Mapped["User"] = relationship("User", back_populates="items")
