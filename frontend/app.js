@@ -164,24 +164,21 @@
 
   screens.address = function () {
     const d = state.draftProfile;
-    const selectedAddress = d.roadAddress || d.addr || "";
+    const selectedAddress = d.regionVerified ? (d.roadAddress || d.addr || "") : "";
     const selected = selectedAddress
       ? '<div class="field"><label>검색된 주소</label><div class="address-selected"><div><strong>' + esc(selectedAddress) + '</strong>'
         + (d.zonecode ? '<span>' + esc(d.zonecode) + '</span>' : '') + '</div><button class="btn ghost small" data-act="search-address">다시 검색</button></div></div>'
         + '<div class="field"><label for="home-address-detail">상세 주소 <span style="font-weight:400;color:var(--ink-3)">(선택)</span></label>'
         + '<input id="home-address-detail" autocomplete="address-line2" enterkeyhint="done" placeholder="예) 101동 1203호" value="' + esc(d.detailAddress || '') + '"></div>'
-      : '<div class="field"><label for="home-address-input">집 주소</label><input id="home-address-input" data-act="home-address" autocomplete="street-address" placeholder="도로명 또는 지번 주소를 입력하세요" value="' + esc(d.addr || "") + '">'
-        + '<button class="address-search" data-act="search-address">' + I.search(18)
-        + '<span><strong>주소 검색</strong><small>검색 서비스가 열리지 않으면 주소를 직접 입력할 수 있어요</small></span>' + I.chevR(17) + '</button></div>'
-        + '<button class="location-button" data-act="current-location"' + (state.locationBusy ? ' disabled' : '') + '>'
-        + I.pin(18) + '<span>' + (state.locationBusy ? '현재 위치를 확인하는 중...' : '현재 위치로 주소 찾기') + '</span></button>'
-        + '<div class="field"><label for="home-region">지역</label><select id="home-region" data-act="home-region"><option value="">수수료 기준 지역을 선택하세요</option>'
-        + L.regions().map(r => '<option value="' + esc(r.sido + "|" + r.sigungu) + '"' + (d.sigungu === r.sigungu && d.sido === r.sido ? ' selected' : '') + '>' + esc(r.sido + " " + r.sigungu) + '</option>').join("")
-        + '</select></div>';
+      : '<div class="field"><label>집 주소</label><button class="address-search" data-act="search-address"' + (state.addressBusy ? ' disabled' : '') + '>' + I.search(18)
+        + '<span><strong>' + (state.addressBusy ? '수수료 데이터 확인 중...' : '주소 검색') + '</strong><small>도로명, 건물명 또는 지번으로 찾기</small></span>' + I.chevR(17) + '</button></div>';
+    const currentAddress = state.addressEdit && d.currentAddress
+      ? '<div class="notice"><span>' + I.home(15) + '</span><span>현재 등록 주소<br><strong>' + esc(d.currentAddress) + '</strong></span></div>' : '';
     return (state.addressEdit ? topbar("집 주소 변경") : '') + '<main class="screen" style="padding-top:' + (state.addressEdit ? '18px' : '42px') + ';gap:22px"><div style="display:grid;gap:7px"><span class="eyebrow" style="color:var(--pine)">내 동네 설정</span>'
       + '<h2 class="title">집 주소를 등록해주세요</h2><p class="lede">입력한 주소는 내 배출 기록과 동네 기준을 설정할 때만 사용해요.</p></div>'
+      + currentAddress
       + selected
-      + '<div class="notice"><span>' + I.pin(15) + '</span><span>검색한 주소의 구·군을 확인해 해당 지역 수수료 기준을 자동으로 적용합니다.</span></div>'
+      + '<div class="notice"><span>' + I.pin(15) + '</span><span>검색한 주소의 구·군에 <strong>실제 수수료 데이터가 있을 때만</strong> 등록할 수 있어요.</span></div>'
       + (state.addressError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.addressError) + '</span></div>' : '')
       + '<div style="flex:1"></div><button class="btn" data-act="save-address">내 주소로 계속하기</button></main>';
   };
@@ -1026,10 +1023,14 @@
   }
 
   function regionFromPostcode(data) {
-    const exact = L.regions().find(r => r.sido === data.sido && r.sigungu === data.sigungu);
-    // 수수료 DB는 전국 데이터이므로, 앱의 예시 지역 목록에 없는 구·군도 저장한다.
-    return exact || regionFromAddress([data.sido, data.sigungu, data.roadAddress, data.jibunAddress].join(" "))
-      || (data.sido && data.sigungu ? { sido: data.sido, sigungu: data.sigungu } : null);
+    return data.sido && data.sigungu ? { sido: data.sido, sigungu: data.sigungu } : null;
+  }
+
+  async function verifyWasteFeeRegion(region) {
+    if (!region) return null;
+    const params = new URLSearchParams({ province: region.sido, district: region.sigungu, limit: "1" });
+    const page = await api("/waste-fees?" + params.toString());
+    return page.total > 0 ? region : null;
   }
 
   function searchHomeAddress() {
@@ -1039,17 +1040,40 @@
       return;
     }
     new window.kakao.Postcode({
-      oncomplete: function (data) {
+      oncomplete: async function (data) {
         const base = data.userSelectedType === "R" ? data.roadAddress : data.jibunAddress;
-        const region = regionFromPostcode(data);
-        state.draftProfile.roadAddress = base || data.address;
-        state.draftProfile.addr = state.draftProfile.roadAddress;
-        state.draftProfile.detailAddress = "";
-        state.draftProfile.zonecode = data.zonecode || "";
-        state.draftProfile.sido = region ? region.sido : "";
-        state.draftProfile.sigungu = region ? region.sigungu : "";
-        state.addressError = region ? "" : "선택한 주소의 수수료 데이터는 아직 준비 중이에요. 추후 지원 지역을 넓혀갈게요.";
+        const candidate = regionFromPostcode(data);
+        state.addressBusy = true;
+        state.addressError = "";
         render();
+        try {
+          const region = await verifyWasteFeeRegion(candidate);
+          if (!region) {
+            state.draftProfile.roadAddress = "";
+            state.draftProfile.addr = "";
+            state.draftProfile.detailAddress = "";
+            state.draftProfile.zonecode = "";
+            state.draftProfile.sido = "";
+            state.draftProfile.sigungu = "";
+            state.draftProfile.regionVerified = false;
+            state.addressError = (candidate ? candidate.sido + " " + candidate.sigungu : "선택한 지역")
+              + "은(는) 현재 대형폐기물 수수료 데이터가 없어 지원하지 않아요.";
+          } else {
+            state.draftProfile.roadAddress = base || data.address;
+            state.draftProfile.addr = state.draftProfile.roadAddress;
+            state.draftProfile.detailAddress = "";
+            state.draftProfile.zonecode = data.zonecode || "";
+            state.draftProfile.sido = region.sido;
+            state.draftProfile.sigungu = region.sigungu;
+            state.draftProfile.regionVerified = true;
+          }
+        } catch (err) {
+          state.draftProfile.regionVerified = false;
+          state.addressError = err.message || "수수료 데이터를 확인하지 못했어요. 잠시 후 다시 시도해주세요.";
+        } finally {
+          state.addressBusy = false;
+          render();
+        }
         requestAnimationFrame(function () {
           const detail = document.getElementById("home-address-detail");
           if (detail) detail.focus();
@@ -1060,14 +1084,14 @@
 
   function saveHomeAddress() {
     const d = state.draftProfile;
-    const base = (d.roadAddress || d.addr || (document.getElementById("home-address-input") || {}).value || "").trim();
+    const base = (d.roadAddress || d.addr || "").trim();
     const detail = ((document.getElementById("home-address-detail") || {}).value || "").trim();
     if (!base) {
       state.addressError = "주소 검색으로 집 주소를 선택해주세요."; render(); return;
     }
-    const region = d.sigungu ? { sido: d.sido, sigungu: d.sigungu } : regionFromAddress(base);
+    const region = d.regionVerified && d.sigungu ? { sido: d.sido, sigungu: d.sigungu } : null;
     if (!region) {
-      state.addressError = "선택한 주소의 수수료 데이터는 아직 준비 중이에요. 추후 지원 지역을 넓혀갈게요.";
+      state.addressError = "주소 검색 후, 수수료 데이터가 있는 지역인지 확인해주세요.";
       render(); return;
     }
     const address = [base, detail].filter(Boolean).join(" ");
@@ -1157,7 +1181,12 @@
       case "search-address": searchHomeAddress(); break;
       case "current-location": useCurrentLocation(); break;
       case "change-address":
-        state.draftProfile = Object.assign({}, state.profile || {}, { roadAddress: (state.profile || {}).addr || "", detailAddress: "" });
+        state.draftProfile = {
+          nickname: (state.profile || {}).nickname || "",
+          currentAddress: (state.profile || {}).addr || "",
+          roadAddress: "", addr: "", detailAddress: "", zonecode: "",
+          sido: "", sigungu: "", regionVerified: false
+        };
         state.addressError = "";
         state.addressEdit = true;
         go("address");
