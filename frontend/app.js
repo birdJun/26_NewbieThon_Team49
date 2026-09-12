@@ -1028,6 +1028,12 @@
 
   async function verifyWasteFeeRegion(region) {
     if (!region) return null;
+    // 앱에 함께 들어 있는 수수료표(관악·성북 등)는 서버 상태와 무관하게 즉시 인정한다.
+    // 그 밖의 지역은 실제 전국 수수료 API에서 다시 확인한다.
+    const bundled = L.regions().find(function (row) {
+      return row.sido === region.sido && row.sigungu === region.sigungu;
+    });
+    if (bundled) return { sido: bundled.sido, sigungu: bundled.sigungu };
     const params = new URLSearchParams({ province: region.sido, district: region.sigungu, limit: "1" });
     const page = await api("/waste-fees?" + params.toString());
     return page.total > 0 ? region : null;
