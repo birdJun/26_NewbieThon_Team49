@@ -165,6 +165,9 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 .address-selected strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .address-selected span { color: var(--ink-3); font-size: 11px; }
 .address-selected .btn { flex: none; }
+.location-button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border: 1px solid var(--pine); border-radius: 10px; color: var(--pine-ink); background: var(--pine-wash); font-size: 13px; font-weight: 600; }
+.location-button svg { color: var(--pine); }
+.location-button:disabled { opacity: .6; cursor: wait; }
 
 /* ── 동네 나눔 ─────────────────────────────────────────── */
 .share-screen { gap: 15px; }
@@ -391,7 +394,7 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 
 /* ── 하단 탭 ───────────────────────────────────────────── */
 .tabs {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--surface); border-top: 1px solid var(--line);
   position: sticky; bottom: 0; z-index: 20;
   padding-bottom: env(safe-area-inset-bottom, 0);
@@ -414,6 +417,23 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 .notice.sample svg { color: var(--share); }
 
 .empty { text-align: center; padding: 40px 20px; color: var(--ink-3); font-size: 13.5px; }
+
+.info-screen { gap: 15px; }
+.info-screen > div:first-child { display: grid; gap: 5px; }
+.seoul-map { padding: 15px; border: 1px solid var(--line); border-radius: var(--radius); background: #eef3f1; }
+.map-label { margin-bottom: 11px; color: var(--pine-ink); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+.district-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.district { min-height: 34px; padding: 5px 2px; border: 1px solid rgba(26,122,86,.14); border-radius: 7px; background: rgba(255,255,255,.75); color: var(--ink-2); font-size: 11px; font-weight: 600; }
+.district:hover, .district.selected { border-color: var(--pine); color: var(--pine-ink); background: var(--pine-wash); }
+.district.available::after { content: ""; display: inline-block; width: 4px; height: 4px; margin: 0 0 2px 3px; border-radius: 50%; background: var(--pine); }
+.district-summary { display: grid; gap: 14px; padding: 15px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.info-status { padding: 4px 7px; border-radius: 999px; background: var(--surface-2); color: var(--ink-3); font-size: 10px; font-weight: 600; }
+.info-status.ready { background: var(--pine-wash); color: var(--pine-ink); }
+.info-stats { display: grid; grid-template-columns: repeat(3, 1fr); padding: 12px 0; border-block: 1px solid var(--line); }
+.info-stats div { display: grid; gap: 2px; text-align: center; border-right: 1px solid var(--line); }
+.info-stats div:last-child { border-right: 0; }
+.info-stats strong { font-family: var(--mono); font-size: 16px; }
+.info-stats span { color: var(--ink-3); font-size: 10.5px; }
 
 .photo-preview {
   width: 100%; aspect-ratio: 4/3; object-fit: cover;

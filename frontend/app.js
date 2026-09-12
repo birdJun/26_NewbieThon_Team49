@@ -41,6 +41,7 @@
     shareActionError: "",
     shareEdit: null,
     shareEditBusy: false,
+    locationBusy: false,
     sheet: null         // 열려 있는 바텀시트 이름
   };
 
@@ -49,6 +50,11 @@
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const won = n => (n == null ? "—" : Number(n).toLocaleString("ko-KR") + "원");
   const CAT_NAME = { furniture: "가구", appliance: "가전", living: "생활용품", etc: "기타" };
+  const SEOUL_DISTRICTS = [
+    "도봉구", "노원구", "강북구", "은평구", "성북구", "중랑구", "종로구", "동대문구", "서대문구",
+    "중구", "성동구", "광진구", "마포구", "용산구", "영등포구", "동작구", "강서구", "양천구",
+    "구로구", "금천구", "관악구", "서초구", "강남구", "송파구", "강동구"
+  ];
 
   function ago(ts) {
     const m = Math.floor((Date.now() - ts) / 60000);
@@ -98,7 +104,7 @@
       '<button class="tab" role="tab" aria-selected="' + (key === active) + '" data-act="tab" data-tab="'
       + key + '">' + icon(21) + '<span>' + label + '</span></button>';
     return '<nav class="tabs" role="tablist">' + t("home", "홈", I.home)
-      + t("share", "나눔", I.gift) + t("activity", "내 나눔", I.clock)
+      + t("info", "정보", I.info) + t("share", "나눔", I.gift) + t("activity", "내 나눔", I.clock)
       + t("me", "내 정보", I.user) + '</nav>';
   }
 
@@ -163,6 +169,8 @@
       : '<div class="field"><label for="home-address-input">집 주소</label><input id="home-address-input" data-act="home-address" autocomplete="street-address" placeholder="도로명 또는 지번 주소를 입력하세요" value="' + esc(d.addr || "") + '">'
         + '<button class="address-search" data-act="search-address">' + I.search(18)
         + '<span><strong>주소 검색</strong><small>검색 서비스가 열리지 않으면 주소를 직접 입력할 수 있어요</small></span>' + I.chevR(17) + '</button></div>'
+        + '<button class="location-button" data-act="current-location"' + (state.locationBusy ? ' disabled' : '') + '>'
+        + I.pin(18) + '<span>' + (state.locationBusy ? '현재 위치를 확인하는 중...' : '현재 위치로 주소 찾기') + '</span></button>'
         + '<div class="field"><label for="home-region">지역</label><select id="home-region" data-act="home-region"><option value="">수수료 기준 지역을 선택하세요</option>'
         + L.regions().map(r => '<option value="' + esc(r.sido + "|" + r.sigungu) + '"' + (d.sigungu === r.sigungu && d.sido === r.sido ? ' selected' : '') + '>' + esc(r.sido + " " + r.sigungu) + '</option>').join("")
         + '</select></div>';
@@ -241,6 +249,25 @@
       +   '전체보기' + I.chevR(14) + '</button></div>'
       + '<div class="list">' + homeSharePreviewHTML() + '</div>'
       + '</main>' + tabs("home");
+  };
+
+  screens.info = function () {
+    const selected = state.infoDistrict || (state.region && state.region.sido === "서울특별시" ? state.region.sigungu : "관악구");
+    const rows = (window.BIUM_FEES || []).filter(r => r.sido === "서울특별시" && r.sigungu === selected);
+    const items = Array.from(new Set(rows.map(r => r.item)));
+    const lowest = rows.length ? rows.reduce((min, row) => Math.min(min, Number(row.fee)), Infinity) : null;
+    const supported = rows.length > 0;
+    const map = SEOUL_DISTRICTS.map(d => '<button class="district ' + (d === selected ? 'selected ' : '') + (supported && d === selected ? 'available' : '') + '" data-act="info-district" data-district="' + d + '" aria-label="' + d + ' 선택">' + (d.endsWith("구") ? d.slice(0, -1) : d) + '</button>').join("");
+    return '<header class="topbar"><h1>서울시 생활 정보</h1></header><main class="screen info-screen">'
+      + '<div><span class="eyebrow">WASTE GUIDE · SEOUL</span><h2 class="title">우리 구 처리 정보를 확인하세요</h2><p class="lede">지도를 눌러 구를 선택하면 등록된 대형폐기물 수수료와 처리 기준을 보여드려요.</p></div>'
+      + '<section class="seoul-map" aria-label="서울시 자치구 선택"><div class="map-label">서울특별시</div><div class="district-grid">' + map + '</div></section>'
+      + '<section class="district-summary"><div class="row-between"><div><span class="eyebrow">선택한 지역</span><h3 class="sub">서울특별시 ' + selected + '</h3></div><span class="info-status ' + (supported ? 'ready' : '') + '">' + (supported ? '데이터 있음' : '준비 중') + '</span></div>'
+      + (supported
+        ? '<div class="info-stats"><div><strong>' + items.length + '</strong><span>품목</span></div><div><strong>' + rows.length + '</strong><span>규격 기준</span></div><div><strong>' + won(lowest) + '</strong><span>최저 수수료</span></div></div>'
+          + '<div class="notice"><span>' + I.truck(15) + '</span><span>대형폐기물은 구청 신고 후 지정 장소에 배출하세요. 정확한 금액과 접수 방법은 <strong>' + selected + '청</strong> 공지를 기준으로 확인합니다.</span></div>'
+          + '<a class="btn ghost" href="' + esc(municipalDisposalUrl({ sido: "서울특별시", sigungu: selected })) + '" target="_blank" rel="noopener">' + I.chevR(17) + selected + ' 배출 신청 안내</a>'
+        : '<div class="notice"><span>' + I.info(15) + '</span><span>현재 이 구의 수수료 데이터는 준비 중입니다. 다른 구를 선택하거나 관할 구청에서 직접 확인해 주세요.</span></div>')
+      + '</section></main>' + tabs("info");
   };
 
   /* 2 · 사진으로 찾기 */
@@ -804,6 +831,11 @@
     try {
       if (state.authMode === "signup") {
         await api("/auth/signup", { method: "POST", body: JSON.stringify({ username: username.trim(), password: password }) });
+        state.authBusy = false;
+        state.authMode = "login";
+        state.authError = "회원가입이 완료되었습니다. 같은 아이디로 로그인해주세요.";
+        render();
+        return;
       }
       const tokenResult = await api("/auth/login", { method: "POST", body: JSON.stringify({ username: username.trim(), password: password }) });
       const me = await api("/auth/me", { headers: { "Authorization": "Bearer " + tokenResult.access_token } });
@@ -961,6 +993,47 @@
     render();
   }
 
+  async function useCurrentLocation() {
+    if (state.locationBusy) return;
+    if (!navigator.geolocation) {
+      state.addressError = "이 브라우저에서는 현재 위치를 사용할 수 없어요. 주소 검색을 이용해주세요.";
+      render();
+      return;
+    }
+    state.locationBusy = true;
+    state.addressError = "";
+    render();
+    navigator.geolocation.getCurrentPosition(async function (position) {
+      try {
+        const result = await window.DeviceAPI.reverseGeocode(position.coords.latitude, position.coords.longitude);
+        const region = regionFromAddress(result.address);
+        if (!region) {
+          state.addressError = "현재 위치의 수수료 기준 지역을 찾지 못했어요. 주소 검색으로 구·군을 선택해주세요.";
+        } else {
+          state.draftProfile.addr = result.address;
+          state.draftProfile.roadAddress = result.address;
+          state.draftProfile.sido = region.sido;
+          state.draftProfile.sigungu = region.sigungu;
+          state.addressError = "";
+        }
+      } catch (err) {
+        state.addressError = err.message || "현재 위치 주소를 확인하지 못했어요.";
+      } finally {
+        state.locationBusy = false;
+        render();
+      }
+    }, function (error) {
+      const messages = {
+        1: "위치 권한이 거부되었습니다. 브라우저 주소창의 위치 권한을 허용해주세요.",
+        2: "현재 위치를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.",
+        3: "위치 확인 시간이 초과되었습니다. 다시 시도해주세요."
+      };
+      state.locationBusy = false;
+      state.addressError = messages[error.code] || "현재 위치를 확인하지 못했어요.";
+      render();
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
+  }
+
   /* ── 이벤트 처리 — 모든 버튼이 여기로 들어온다 ────────── */
   app.addEventListener("click", function (e) {
     const el = e.target.closest("[data-act]");
@@ -986,6 +1059,7 @@
         break;
       case "save-address": saveHomeAddress(); break;
       case "search-address": searchHomeAddress(); break;
+      case "current-location": useCurrentLocation(); break;
       case "change-address":
         state.draftProfile = Object.assign({}, state.profile || {}, { roadAddress: (state.profile || {}).addr || "", detailAddress: "" });
         state.addressError = "";
@@ -1016,10 +1090,13 @@
         state.screen = "login"; render(); break;
       case "tab":
         state.stack = [];
-        state.screen = { home: "home", share: "shareList", activity: "myShares", me: "me" }[el.dataset.tab];
+        state.screen = { home: "home", info: "info", share: "shareList", activity: "myShares", me: "me" }[el.dataset.tab];
         render();
         if (state.screen === "home" || state.screen === "shareList" || state.screen === "myShares") loadShareItems();
         break;
+      case "info-district":
+        state.infoDistrict = el.dataset.district;
+        render(); break;
 
       case "sheet":       state.sheet = el.dataset.sheet; render(); break;
       case "close-sheet": if (e.target === el) { state.sheet = null; render(); } break;
@@ -1053,6 +1130,17 @@
   });
 
   /* 검색창 입력 */
+  app.addEventListener("compositionstart", function (e) {
+    if (e.target.dataset.act === "ob-name") state.composingNickname = true;
+  });
+
+  app.addEventListener("compositionend", function (e) {
+    if (e.target.dataset.act !== "ob-name") return;
+    state.composingNickname = false;
+    state.draftProfile.nickname = e.target.value;
+    render();
+  });
+
   app.addEventListener("input", function (e) {
     if (e.target.dataset.act === "share-search") {
       state.shareQuery = e.target.value;
@@ -1069,6 +1157,7 @@
       const key = e.target.dataset.act;
       if (key === "ob-name") state.draftProfile.nickname = e.target.value;
       else state.q = e.target.value.trim();
+      if (key === "ob-name" && (e.isComposing || state.composingNickname)) return;
       const pos = e.target.selectionStart;
       render();
       const next = app.querySelector('[data-act="' + key + '"]');
