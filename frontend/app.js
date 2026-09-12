@@ -414,9 +414,10 @@
     const options = state.feeOptions || [];
     const cards = options.map(function (row) {
       return '<button class="official-fee" data-act="choose-official-fee" data-fee-id="' + esc(row.id) + '">'
-        + '<span class="official-fee-main"><strong>' + esc(row.itemName) + '</strong>'
-        + '<small>' + esc(row.spec || "규격 정보 없음") + '</small></span>'
-        + '<span class="official-fee-price">' + won(row.amount) + '</span></button>';
+        + '<span class="official-fee-main"><small>구청 품목 · ' + esc(row.itemName) + '</small>'
+        + '<strong>' + esc(row.spec || "규격 정보 없음") + '</strong></span>'
+        + '<span class="official-fee-side"><small>배출 수수료</small><strong>' + won(row.amount) + '</strong>'
+        + '<span class="official-fee-select">이 규격 선택 ' + I.chevR(14) + '</span></span></button>';
     }).join("");
     let body = '';
     if (state.feeBusy) {
@@ -429,11 +430,11 @@
         + esc(state.feeError || "이 지역의 공식 규격을 찾지 못했어요.") + '</span></div>'
         + '<button class="btn ghost" data-act="go" data-to="pick">다른 품목 고르기</button>';
     }
-    return topbar("구청 기준 규격 확인") + '<main class="screen">'
+    return topbar("구청 기준 규격 확인") + '<main class="screen official-fee-screen">'
       + '<div style="display:grid;gap:7px"><span class="eyebrow">' + esc(state.region.sido) + ' ' + esc(state.region.sigungu) + ' 기준</span>'
       + '<h2 class="title">실제 규격을 선택해주세요</h2>'
       + '<p class="lede">선택한 품목은 <strong>' + esc(item.name) + ' · ' + esc(state.draft.spec)
-        + '</strong>예요. 구청 수수료표의 정확한 품목·규격을 골라야 수수료가 맞습니다.</p></div>'
+        + '</strong>예요. 아래에서 실제 크기와 가장 가까운 규격을 선택하세요.</p></div>'
       + '<div class="notice"><span>' + I.info(15) + '</span><span>지역마다 명칭과 규격이 달라요. 아래는 <strong>전국대형폐기물수거수수료정보표준데이터</strong>에서 조회한 항목입니다.</span></div>'
       + body + '</main>';
   };
