@@ -178,7 +178,6 @@
       + '<h2 class="title">집 주소를 등록해주세요</h2><p class="lede">입력한 주소는 내 배출 기록과 동네 기준을 설정할 때만 사용해요.</p></div>'
       + currentAddress
       + selected
-      + '<div class="notice"><span>' + I.pin(15) + '</span><span>검색한 주소의 구·군에 <strong>실제 수수료 데이터가 있을 때만</strong> 등록할 수 있어요.</span></div>'
       + (state.addressError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.addressError) + '</span></div>' : '')
       + '<div style="flex:1"></div><button class="btn" data-act="save-address">내 주소로 계속하기</button></main>';
   };
@@ -209,8 +208,6 @@
         : '<div class="field"><label for="ob-addr">상세 주소 (선택)</label><input id="ob-addr" data-act="ob-addr" placeholder="예) 신림로 12길, 3층" value=""></div>')
       + '<div style="flex:1"></div>'
       + '<button class="btn" data-act="ob-submit"' + (ready ? "" : " disabled") + '>시작하기</button>'
-      + '<p class="lede" style="font-size:11.5px;text-align:center;color:var(--ink-3)">'
-      +   '한 번 입력하면 이 기기에서는 다시 묻지 않습니다.</p>'
       + '</main>';
   };
 
