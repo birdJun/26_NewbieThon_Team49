@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from app.core.database import Base, engine
 from app.modules.core_trade.router import router as core_router
+from app.modules.device.router import UPLOAD_DIR, router as device_router
 from app.modules.core_trade.scheduler import shutdown_scheduler, start_scheduler
 import logging
 
@@ -35,6 +36,8 @@ app = FastAPI(
 )
 
 app.include_router(core_router, prefix="/api/v1")
+app.include_router(device_router)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.get("/health")
 async def health():
