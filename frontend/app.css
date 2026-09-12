@@ -359,6 +359,18 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
   font-size: 11px; color: var(--ink-3); font-family: var(--mono);
 }
 
+/* 실제 지자체 수수료표에서 가져온 품목·규격 선택 */
+.official-fee {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px;
+  text-align: left; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); transition: border-color .12s ease, background .12s ease;
+}
+.official-fee:hover { border-color: var(--pine); background: var(--pine-wash); }
+.official-fee-main { display: grid; gap: 3px; min-width: 0; }
+.official-fee-main strong { font-size: 14.5px; font-weight: 600; }
+.official-fee-main small { color: var(--ink-2); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.official-fee-price { margin-left: auto; flex: none; font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--dispose); font-variant-numeric: tabular-nums; }
+
 .center-card { display: grid; gap: 6px; padding: 14px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--line); }
 .center-card .row { display: flex; align-items: center; gap: 8px; }

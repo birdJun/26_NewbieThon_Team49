@@ -38,6 +38,10 @@
     shareActionError: "",
     shareEdit: null,
     shareEditBusy: false,
+    actualFee: null,
+    feeOptions: [],
+    feeBusy: false,
+    feeError: "",
     sheet: null         // 열려 있는 바텀시트 이름
   };
 
@@ -316,6 +320,37 @@
       + '</main>';
   };
 
+  /* 실제 공공데이터의 품목명과 규격은 지역마다 다르다. 화면의 쉬운 품목
+     선택은 여기까지로 두고, 다음 화면에서 사용자가 구청 기준 규격을 확정한다. */
+  screens.officialFee = function () {
+    const item = L.findItem(state.draft.itemId);
+    const options = state.feeOptions || [];
+    const cards = options.map(function (row) {
+      return '<button class="official-fee" data-act="choose-official-fee" data-fee-id="' + esc(row.id) + '">'
+        + '<span class="official-fee-main"><strong>' + esc(row.itemName) + '</strong>'
+        + '<small>' + esc(row.spec || "규격 정보 없음") + '</small></span>'
+        + '<span class="official-fee-price">' + won(row.amount) + '</span></button>';
+    }).join("");
+    let body = '';
+    if (state.feeBusy) {
+      body = '<div class="empty"><span class="spinner" style="color:var(--pine);display:inline-block"></span>'
+        + '<p>구청 수수료 기준을 불러오는 중이에요.</p></div>';
+    } else if (options.length) {
+      body = '<div class="list">' + cards + '</div>';
+    } else {
+      body = '<div class="notice error">' + I.info(15) + '<span>'
+        + esc(state.feeError || "이 지역의 공식 규격을 찾지 못했어요.") + '</span></div>'
+        + '<button class="btn ghost" data-act="go" data-to="pick">다른 품목 고르기</button>';
+    }
+    return topbar("구청 기준 규격 확인") + '<main class="screen">'
+      + '<div style="display:grid;gap:7px"><span class="eyebrow">' + esc(state.region.sido) + ' ' + esc(state.region.sigungu) + ' 기준</span>'
+      + '<h2 class="title">실제 규격을 선택해주세요</h2>'
+      + '<p class="lede">선택한 품목은 <strong>' + esc(item.name) + ' · ' + esc(state.draft.spec)
+        + '</strong>예요. 구청 수수료표의 정확한 품목·규격을 골라야 수수료가 맞습니다.</p></div>'
+      + '<div class="notice"><span>' + I.info(15) + '</span><span>지역마다 명칭과 규격이 달라요. 아래는 <strong>전국대형폐기물수거수수료정보표준데이터</strong>에서 조회한 항목입니다.</span></div>'
+      + body + '</main>';
+  };
+
   function itemBtn(i) {
     return '<button class="item-btn" data-act="pick-item" data-item="' + i.id + '">' + esc(i.name) + '</button>';
   }
@@ -324,6 +359,8 @@
   screens.result = function () {
     const item = L.findItem(state.draft.itemId);
     const spec = state.draft.spec;
+    const actual = state.actualFee;
+    const hasActualFee = actual && actual.amount != null;
     const p = L.paths(state.region, item, spec);
 
     const card = (cls, icon, title, desc, amt, unit, note, opts) => {
@@ -345,13 +382,13 @@
       { act: "go-share", badge: p.share.recommended ? "추천" : null, amtClass: "free" });
     // ② 배출
     paths += card("dispose", I.truck, "구청에 배출 신청", "신청하고 집 앞에 내놓으면 수거해 갑니다",
-      p.dispose.unknown ? "확인 필요" : won(p.dispose.fee),
-      p.dispose.unknown ? "데이터 없음" : esc(state.region.sigungu) + " 수수료",
-      p.dispose.unknown
-        ? "이 지역 수수료 데이터에 이 품목이 없습니다. 구청에 직접 확인해 주세요."
-        : "신청하면 배출번호가 나옵니다. 종이에 적어 물건에 붙여 내놓으세요."
-          + (p.dispose.exact ? "" : " (규격 <strong>" + esc(p.dispose.spec) + "</strong> 기준으로 계산)"),
-      { act: "go-dispose" });
+      hasActualFee ? won(actual.amount) : "규격 선택 필요",
+      hasActualFee ? "실제 표준데이터" : "구청 기준 확인",
+      hasActualFee
+        ? esc(actual.org || "관리기관 정보 없음") + " · 기준일 " + esc(actual.referenceDate || "정보 없음")
+          + (actual.spec ? " · 규격 <strong>" + esc(actual.spec) + "</strong>" : "")
+        : "구청 기준 품목과 규격을 먼저 선택해주세요.",
+      { act: hasActualFee ? "go-dispose" : "select-official-fee" });
     // ③ 재활용
     const n = p.recycle.national[0];
     paths += card("recycle", I.recyc, n ? "무상 방문수거" : "재활용센터에 넘기기",
@@ -366,9 +403,8 @@
       +   '<h2 class="title">세 가지 방법이 있습니다</h2></div>'
       + '<div class="paths">' + paths + '</div>'
       + '<div style="flex:1"></div>'
-      + sampleNotice()
-      + '<div class="notice">' + I.info(15) + '<span>수수료는 <strong>공공데이터포털 '
-      +   '전국대형폐기물수거수수료정보표준데이터</strong>를 따릅니다. 실제 금액은 구청 고시 기준으로 달라질 수 있습니다.</span></div>'
+      + (hasActualFee ? '<div class="notice"><span>' + I.check(15) + '</span><span><strong>전국대형폐기물수거수수료정보표준데이터</strong>에서 사용자가 선택한 값입니다. 실제 신청 전 구청 기준을 다시 확인해 주세요.</span></div>' : '')
+      + (state.feeError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.feeError) + '</span></div>' : '')
       + '</main>';
   };
 
@@ -680,6 +716,64 @@
     return token ? { Authorization: "Bearer " + token } : {};
   }
 
+  const feeNorm = value => String(value || "").replace(/[\s·()]/g, "").toLowerCase();
+
+  function goToOfficialFeePicker() {
+    state.actualFee = null;
+    state.feeOptions = [];
+    state.feeError = "";
+    state.feeBusy = true;
+    go("officialFee");
+    loadOfficialFeeOptions();
+  }
+
+  async function loadOfficialFeeOptions() {
+    const item = L.findItem(state.draft.itemId);
+    if (!item || !state.region) return;
+    try {
+      const terms = Array.from(new Set([item.name].concat(item.match || []).filter(Boolean)));
+      const rows = [];
+      const seen = new Set();
+      for (const term of terms) {
+        const params = new URLSearchParams({
+          province: state.region.sido, district: state.region.sigungu, q: term, limit: "100"
+        });
+        const page = await api("/waste-fees?" + params.toString());
+        page.items.filter(row => row.amount_krw != null).forEach(function (row) {
+          if (!seen.has(row.id)) { seen.add(row.id); rows.push(row); }
+        });
+      }
+      const itemScore = row => {
+        const name = feeNorm(row.item_name);
+        const catalog = feeNorm(item.name);
+        if (name === catalog) return 100;
+        return (item.match || []).reduce((best, keyword) => {
+          const word = feeNorm(keyword);
+          if (!word) return best;
+          if (name === word) return Math.max(best, 90);
+          if (name.includes(word) || word.includes(name)) return Math.max(best, 50);
+          return best;
+        }, 0);
+      };
+      const bestItemScore = Math.max.apply(null, rows.map(itemScore));
+      const matches = rows.filter(row => itemScore(row) === bestItemScore && bestItemScore > 0);
+      if (!matches.length) throw new Error("선택한 품목과 일치하는 구청 수수료 기준을 찾지 못했어요.");
+      state.feeOptions = matches.map(function (row) {
+        return {
+          id: String(row.id), itemName: row.item_name, spec: row.size_label,
+          amount: row.amount_krw, raw: row.fee_raw,
+          org: row.managing_organization, referenceDate: row.reference_date
+        };
+      });
+    } catch (err) {
+      state.feeOptions = [];
+      state.feeError = err.message || "실제 수수료 조회에 실패했어요.";
+    } finally {
+      state.feeBusy = false;
+      if (state.screen === "officialFee") render();
+    }
+  }
+
   async function loadShareItems() {
     state.shareLoading = true;
     state.shareError = "";
@@ -874,7 +968,9 @@
 
   function regionFromPostcode(data) {
     const exact = L.regions().find(r => r.sido === data.sido && r.sigungu === data.sigungu);
-    return exact || regionFromAddress([data.sido, data.sigungu, data.roadAddress, data.jibunAddress].join(" "));
+    // 수수료 DB는 전국 데이터이므로, 앱의 예시 지역 목록에 없는 구·군도 저장한다.
+    return exact || regionFromAddress([data.sido, data.sigungu, data.roadAddress, data.jibunAddress].join(" "))
+      || (data.sido && data.sigungu ? { sido: data.sido, sigungu: data.sigungu } : null);
   }
 
   function searchHomeAddress() {
@@ -1008,13 +1104,23 @@
         if (state.screen !== "pick") go("pick", { replace: true }); else render();
         break;
       case "spec": d.spec = el.dataset.spec; render(); break;
-      case "to-result": go("result"); break;
+      case "to-result": goToOfficialFeePicker(); break;
+      case "select-official-fee": go("officialFee"); break;
+      case "choose-official-fee": {
+        const selected = state.feeOptions.find(row => row.id === el.dataset.feeId);
+        if (!selected) return;
+        state.actualFee = selected;
+        state.draft.officialSpec = selected.spec;
+        state.feeError = "";
+        go("result", { replace: true });
+        break;
+      }
 
       case "retake":     d.photo = null; d.ai = null; state.aiError = ""; render(); break;
       case "confirm-ai":
         d.itemId = d.ai.itemId;
         d.spec = d.ai.spec || L.findItem(d.ai.itemId).specs[0];
-        go("result"); break;
+        goToOfficialFeePicker(); break;
 
       case "go-share":   go("shareForm"); break;
       case "go-centers": go("centers"); break;
@@ -1149,11 +1255,17 @@
   function submitDispose() {
     const d = state.draft;
     const item = L.findItem(d.itemId);
-    const p = L.paths(state.region, item, d.spec);
-    if (p.dispose.unknown) { alert("이 지역 수수료 데이터에 이 품목이 없습니다. 구청에 직접 확인해 주세요."); return; }
+    if (state.feeBusy) { alert("실제 수수료를 조회 중이에요. 잠시만 기다려주세요."); return; }
+    const actual = state.actualFee;
+    if (!actual) {
+      alert("구청 기준 품목과 규격을 먼저 선택해주세요.");
+      goToOfficialFeePicker();
+      return;
+    }
 
-    state.disposePlan = { itemId: d.itemId, itemName: item.name, spec: p.dispose.spec,
-      fee: p.dispose.fee, org: p.dispose.org, sido: state.region.sido, sigungu: state.region.sigungu };
+    state.disposePlan = { itemId: d.itemId, itemName: actual.itemName || item.name, spec: actual.spec,
+      fee: actual.amount, org: actual.org, referenceDate: actual.referenceDate || "",
+      sido: state.region.sido, sigungu: state.region.sigungu };
 
     go("sticker");
   }

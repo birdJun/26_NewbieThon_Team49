@@ -6,6 +6,8 @@ from app.core.database import Base, engine
 from app.modules.core_trade.router import router as core_router
 from app.modules.device.router import UPLOAD_DIR, router as device_router
 from app.modules.core_trade.scheduler import shutdown_scheduler, start_scheduler
+from app.waste_fee_db.app.waste_fee_api import waste_fee_router
+from app.waste_fee_db.app.waste_fee_db import restore_waste_fee_db
 import logging
 
 # 콘솔에 INFO 레벨 이상의 로그를 모두 출력하도록 설정
@@ -20,12 +22,19 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # 2. 백그라운드 만료 체크 스케줄러 가동
+    # 2. 실제 전국 수수료 DB가 없을 때만 커밋된 시드에서 복원한다.
+    try:
+        restore_waste_fee_db()
+        logging.info("[WasteFee] 실제 수수료 DB를 시드에서 복원했습니다.")
+    except FileExistsError:
+        pass
+
+    # 3. 백그라운드 만료 체크 스케줄러 가동
     start_scheduler()
 
     yield
 
-    # 3. 서버 종료 시 스케줄러 정지
+    # 4. 서버 종료 시 스케줄러 정지
     shutdown_scheduler()
 
 
@@ -37,6 +46,7 @@ app = FastAPI(
 
 app.include_router(core_router, prefix="/api/v1")
 app.include_router(device_router)
+app.include_router(waste_fee_router)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.get("/health")
