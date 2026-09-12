@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.core.database import Base, engine
 from app.modules.core_trade.router import router as core_router
 from app.modules.core_trade.scheduler import shutdown_scheduler, start_scheduler
@@ -34,7 +36,11 @@ app = FastAPI(
 
 app.include_router(core_router, prefix="/api/v1")
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-@app.get("/")
-async def root():
-    return {"message": "Resource Circulation API Server is Running"}
+
+# API 아래 경로를 먼저 등록한 뒤, 나머지는 프론트엔드 앱으로 제공한다.
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
