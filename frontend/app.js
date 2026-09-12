@@ -60,13 +60,11 @@
     "중구", "성동구", "광진구", "마포구", "용산구", "영등포구", "동작구", "강서구", "양천구",
     "구로구", "금천구", "관악구", "서초구", "강남구", "송파구", "강동구"
   ];
-  const INFO_METROS = ["서울특별시", "부산광역시", "대구광역시", "인천광역시", "광주광역시", "대전광역시", "울산광역시"];
-  const INFO_PROVINCES = ["경기도", "강원특별자치도", "충청북도", "충청남도", "전북특별자치도", "전라남도", "경상북도", "경상남도"];
   const INFO_SHORT_NAMES = {
     "서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천",
     "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산", "경기도": "경기",
     "강원특별자치도": "강원", "충청북도": "충북", "충청남도": "충남", "전북특별자치도": "전북",
-    "전라남도": "전남", "경상북도": "경북", "경상남도": "경남"
+    "전라남도": "전남", "경상북도": "경북", "경상남도": "경남", "세종특별자치시": "세종", "제주특별자치도": "제주"
   };
 
   function selectedInfoRegion() {
@@ -78,13 +76,24 @@
   }
 
   function infoTopRegions() {
-    return INFO_METROS.map(sido => ({ sido, type: "metro" }))
-      .concat(INFO_PROVINCES.map(sido => ({ sido, type: "province" })));
+    return Object.entries(window.BIUM_INFO_REGIONS || {}).map(([sido, data]) => ({ sido, type: data.type }));
   }
 
   function infoChildren(sido) {
-    if (sido === "서울특별시") return SEOUL_DISTRICTS.map(sigungu => ({ sido, sigungu }));
-    return infoRegions().filter(region => region.sido === sido);
+    const data = (window.BIUM_INFO_REGIONS || {})[sido];
+    return data ? data.children.map(sigungu => ({ sido, sigungu })) : infoRegions().filter(region => region.sido === sido);
+  }
+
+  function infoRegionType(sido) {
+    return (window.BIUM_INFO_REGIONS || {})[sido]?.type || "metro";
+  }
+
+  function infoShortChildName(name) {
+    return /[구군시]$/.test(name) ? name.slice(0, -1) : name;
+  }
+
+  function infoDisplayRegion(sido, sigungu) {
+    return esc(INFO_SHORT_NAMES[sido] || sido) + "<br>" + esc(infoShortChildName(sigungu));
   }
 
   function ago(ts) {
@@ -807,9 +816,9 @@
       }
       const selectableRegions = infoChildren(province);
       return '<div class="sheet-backdrop" data-act="close-sheet"><div class="sheet" role="dialog" aria-label="정보 지역 선택">'
-        + '<button class="text-btn" data-act="info-back-province">← 지역 다시 선택</button><h3 class="sub">' + esc(province) + ' ' + (INFO_PROVINCES.includes(province) ? '시' : '구') + ' 선택</h3>'
-        + '<p class="lede" style="font-size:12.5px">' + (INFO_PROVINCES.includes(province) ? '시를 선택하세요.' : '구를 선택하세요.') + '</p>'
-        + '<div class="list">' + selectableRegions.map(r => '<button class="card" data-act="info-set-region" data-sido="' + esc(r.sido) + '" data-sigungu="' + esc(r.sigungu) + '"><span class="body"><h4>' + esc(r.sido + ' ' + r.sigungu) + '</h4><p>' + (r.sido === '서울특별시' ? '생활정보 제공' : '업데이트 예정') + '</p></span>' + (r.sido === selected.sido && r.sigungu === selected.sigungu ? '<span class="info-status ready">선택됨</span>' : '') + '</button>').join("") + '</div>'
+        + '<button class="text-btn" data-act="info-back-province">← 지역 다시 선택</button><h3 class="sub">' + esc(INFO_SHORT_NAMES[province] || province) + ' ' + (infoRegionType(province) === 'province' ? '시·군' : '구·군') + ' 선택</h3>'
+        + '<p class="lede" style="font-size:12.5px">' + (infoRegionType(province) === 'province' ? '시·군을 선택하세요.' : '구·군을 선택하세요.') + '</p>'
+        + '<div class="info-region-grid">' + selectableRegions.map(r => '<button class="card" data-act="info-set-region" data-sido="' + esc(r.sido) + '" data-sigungu="' + esc(r.sigungu) + '"><span class="body"><h4>' + infoDisplayRegion(r.sido, r.sigungu) + '</h4><p>' + (r.sido === '서울특별시' ? '생활정보 제공' : '업데이트 예정') + '</p></span>' + (r.sido === selected.sido && r.sigungu === selected.sigungu ? '<span class="info-status ready">선택됨</span>' : '') + '</button>').join("") + '</div>'
         + '<button class="btn ghost" data-act="close-sheet">닫기</button></div></div>';
     }
     return '<div class="sheet-backdrop" data-act="close-sheet"><div class="sheet" role="dialog" aria-label="지역 선택">'
