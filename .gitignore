@@ -1,0 +1,28 @@
+# 1. 의존성 패키지 (용량이 크고 각자 npm install로 받으므로 제외)
+node_modules/
+package-lock.json.bak
+
+# 2. 빌드 결과물 (배포/실행 시 생성되는 파일)
+dist/
+build/
+out/
+.next/
+
+# 3. 환경변수 및 보안 키 (API 키 노출 방지 필수!)
+.env
+.env.local
+.env.*.local
+*.env
+
+# 4. 운영체제 및 에디터 임시 설정 파일
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 5. 로그 파일
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
