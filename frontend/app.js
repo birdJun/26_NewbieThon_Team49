@@ -26,6 +26,13 @@
     authError: "",
     authMode: "login",
     authBusy: false,
+    shareItems: [],
+    shareLoading: false,
+    shareError: "",
+    shareQuery: "",
+    shareSort: "recent",
+    shareSubmitting: false,
+    shareFormError: "",
     sheet: null         // 열려 있는 바텀시트 이름
   };
 
@@ -367,7 +374,9 @@
       + '<div class="field"><label for="f-dong">받아 가실 곳</label>'
       +   '<input id="f-dong" placeholder="예) 신림동 공동현관 앞" value="' + esc(d.dong || "") + '"></div>'
       + '<div style="flex:1"></div>'
-      + '<button class="btn" data-act="submit-share">나눔 올리기</button>'
+      + (state.shareFormError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.shareFormError) + '</span></div>' : '')
+      + '<button class="btn" data-act="submit-share"' + (state.shareSubmitting ? ' disabled' : '') + '>'
+      + (state.shareSubmitting ? '올리는 중...' : '나눔 올리기') + '</button>'
       + '</main>';
   };
 
@@ -426,25 +435,58 @@
       + '</main>' + tabs("home");
   };
 
-  /* 8 · 나눔 목록 */
-  screens.shareList = function () {
-    let list = S.posts();
-    if (state.filter !== "all") list = list.filter(p => {
-      const it = L.findItem(p.itemId);
-      return it && it.cat === state.filter;
+  function shareStatus(item) {
+    return {
+      AVAILABLE: ["나눔중", "open"], RESERVED: ["예약됨", "held"], COMPLETED: ["나눔 완료", "done"],
+      EXPIRED_UNMATCHED: ["나눔 종료", "done"], DISPOSAL_PENDING: ["배출 예정", "done"]
+    }[item.status] || ["나눔중", "open"];
+  }
+
+  function visibleShareItems() {
+    const q = state.shareQuery.trim().toLowerCase();
+    const list = state.shareItems.filter(item => !q || [item.title, item.description, item.locationName]
+      .join(" ").toLowerCase().includes(q));
+    return list.sort(function (a, b) {
+      if (state.shareSort === "closing") return a.expiresAt - b.expiresAt;
+      if (state.shareSort === "oldest") return a.registeredAt - b.registeredAt;
+      return b.registeredAt - a.registeredAt;
     });
-    return '<header class="topbar"><h1>우리 동네 나눔</h1>'
-      + '<span style="font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:3px">'
-      + I.pin(14) + esc(state.region.sigungu) + '</span></header>'
-      + '<main class="screen">'
-      + '<div class="chips">'
-      +   '<button class="chip" data-act="filter" data-filter="all" aria-pressed="' + (state.filter === "all") + '">전체</button>'
-      +   (window.BIUM_CATEGORIES || []).map(c => '<button class="chip" data-act="filter" data-filter="' + c.id
-          + '" aria-pressed="' + (state.filter === c.id) + '">' + esc(c.name) + '</button>').join("")
-      + '</div>'
-      + '<div class="list">' + (list.length ? list.map(postCard).join("")
-          : '<p class="empty">아직 올라온 나눔이 없습니다.</p>') + '</div>'
-      + '</main>' + tabs("share");
+  }
+
+  function shareGridHTML() {
+    if (state.shareLoading) return '<div class="share-loading"><span class="spinner"></span><span>동네 나눔글을 불러오는 중이에요.</span></div>';
+    if (state.shareError) return '<div class="notice error"><span>' + I.info(15) + '</span><span>' + esc(state.shareError)
+      + '<br><button class="text-btn" data-act="reload-share">다시 불러오기</button></span></div>';
+    const list = visibleShareItems();
+    if (!list.length) return '<p class="empty">' + (state.shareQuery ? '검색 결과가 없어요.' : '아직 올라온 나눔이 없습니다.<br>첫 나눔을 올려보세요!') + '</p>';
+    return list.map(function (item) {
+      const status = shareStatus(item);
+      return '<article class="share-item" data-share-card><div class="share-photo">'
+        + (item.imageUrl ? '<img src="' + esc(item.imageUrl) + '" alt="' + esc(item.title) + '">' : '<span>' + I.box(34) + '</span>')
+        + '<span class="share-status ' + status[1] + '">' + status[0] + '</span></div>'
+        + '<div class="share-item-info"><h3>' + esc(item.title) + '</h3><p>' + esc(item.locationName || state.region.sigungu) + ' · ' + ago(item.registeredAt) + '</p>'
+        + '<strong>무료나눔</strong></div></article>';
+    }).join("");
+  }
+
+  function updateShareGrid() {
+    const grid = document.getElementById("share-grid");
+    const count = document.getElementById("share-count");
+    if (grid) grid.innerHTML = shareGridHTML();
+    if (count) count.textContent = visibleShareItems().length + "개";
+  }
+
+  /* 8 · 나눔 목록 — FastAPI /items 공개 목록 */
+  screens.shareList = function () {
+    const address = (state.profile && state.profile.addr) || (state.region.sido + " " + state.region.sigungu);
+    return '<main class="screen share-screen"><div class="share-heading"><h1>우리 동네 나눔</h1>'
+      + '<button class="share-location" data-act="change-address">' + I.pin(15) + '<span>' + esc(address) + '</span>' + I.chevR(14) + '</button></div>'
+      + '<label class="share-search"><span>' + I.search(19) + '</span><input data-act="share-search" autocomplete="off" placeholder="어떤 물건을 찾으세요?" value="' + esc(state.shareQuery) + '"></label>'
+      + '<div class="share-toolbar"><span>나눔글 <strong id="share-count">' + visibleShareItems().length + '개</strong></span>'
+      + '<select data-act="share-sort" aria-label="나눔글 정렬"><option value="recent"' + (state.shareSort === "recent" ? " selected" : "") + '>최신순</option>'
+      + '<option value="closing"' + (state.shareSort === "closing" ? " selected" : "") + '>마감 임박순</option>'
+      + '<option value="oldest"' + (state.shareSort === "oldest" ? " selected" : "") + '>오래된순</option></select></div>'
+      + '<div class="share-grid" id="share-grid">' + shareGridHTML() + '</div></main>' + tabs("share");
   };
 
   const STATUS = { open: ["나눔중", "var(--pine)", "var(--pine-wash)"],
@@ -524,10 +566,38 @@
   }
 
   async function api(path, options) {
-    const res = await fetch(API_BASE + path, Object.assign({ headers: { "Content-Type": "application/json" } }, options || {}));
+    const opts = options || {};
+    const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+    const res = await fetch(API_BASE + path, Object.assign({}, opts, { headers: headers }));
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.detail || body.error || "서버 요청에 실패했습니다. (" + res.status + ")");
     return body;
+  }
+
+  function authHeaders() {
+    const token = S.token();
+    return token ? { Authorization: "Bearer " + token } : {};
+  }
+
+  async function loadShareItems() {
+    state.shareLoading = true;
+    state.shareError = "";
+    if (state.screen === "shareList") render();
+    try {
+      const items = await api("/items?limit=100");
+      state.shareItems = items.map(function (item) {
+        return {
+          id: item.id, title: item.title, description: item.description || "", imageUrl: item.image_url,
+          locationName: item.location_name || "", status: item.status,
+          registeredAt: new Date(item.registered_at).getTime(), expiresAt: new Date(item.expires_at).getTime()
+        };
+      });
+    } catch (err) {
+      state.shareError = err.message || "나눔글을 불러오지 못했어요.";
+    } finally {
+      state.shareLoading = false;
+      if (state.screen === "shareList") render();
+    }
   }
 
   async function passwordAuth() {
@@ -713,6 +783,7 @@
         state.draftProfile.sigungu = el.dataset.sigungu;
         render(); break;
       case "ob-submit": submitOnboarding(); break;
+      case "reload-share": loadShareItems(); break;
       case "logout":
         if (!confirm("로그아웃할까요? 이 기기에 저장된 닉네임이 지워집니다.")) return;
         S.logout();
@@ -721,7 +792,9 @@
       case "tab":
         state.stack = [];
         state.screen = { home: "home", share: "shareList", me: "me" }[el.dataset.tab];
-        render(); break;
+        render();
+        if (state.screen === "shareList") loadShareItems();
+        break;
 
       case "sheet":       state.sheet = el.dataset.sheet; render(); break;
       case "close-sheet": if (e.target === el) { state.sheet = null; render(); } break;
@@ -756,6 +829,11 @@
 
   /* 검색창 입력 */
   app.addEventListener("input", function (e) {
+    if (e.target.dataset.act === "share-search") {
+      state.shareQuery = e.target.value;
+      updateShareGrid();
+      return;
+    }
     if (e.target.dataset.act === "ob-addr") { state.draftProfile.addr = e.target.value; return; }
     if (e.target.dataset.act === "ob-name" || e.target.dataset.act === "search") {
       const key = e.target.dataset.act;
@@ -770,6 +848,11 @@
 
   /* 사진 선택 → 축소 → AI 인식 */
   app.addEventListener("change", async function (e) {
+    if (e.target.dataset.act === "share-sort") {
+      state.shareSort = e.target.value;
+      updateShareGrid();
+      return;
+    }
     if (e.target.dataset.act !== "photo") return;
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -813,22 +896,37 @@
     render();
   }
 
-  function submitShare() {
+  async function submitShare() {
+    if (state.shareSubmitting) return;
     const d = state.draft;
     const title = (document.getElementById("f-title") || {}).value || "";
     const desc = (document.getElementById("f-desc") || {}).value || "";
     const dong = (document.getElementById("f-dong") || {}).value || "";
-    if (!title.trim()) { alert("제목을 적어주세요."); return; }
+    if (!title.trim()) { state.shareFormError = "제목을 적어주세요."; render(); return; }
 
-    const item = L.findItem(d.itemId);
-    S.addPost({ itemId: d.itemId, itemName: item.name, spec: d.spec,
-      title: title.trim(), desc: desc.trim(), cond: d.cond || "사용감 적음",
-      dong: dong.trim() || state.region.sigungu, photo: d.photo || null });
-
-    state.draft = {};
-    state.stack = [];
-    state.screen = "shareList";
-    render();
+    d.title = title; d.desc = desc; d.dong = dong;
+    state.shareSubmitting = true;
+    state.shareFormError = "";
+    try {
+      await api("/items", {
+        method: "POST", headers: authHeaders(), body: JSON.stringify({
+          title: title.trim(), description: desc.trim() || "나눔할 물건입니다.", price: 0,
+          image_url: d.photo || null,
+          location_name: dong.trim() || (state.profile && state.profile.addr) || state.region.sigungu,
+          unmatched_limit_days: 7
+        })
+      });
+      state.draft = {};
+      state.stack = [];
+      state.shareQuery = "";
+      state.screen = "shareList";
+      state.shareSubmitting = false;
+      await loadShareItems();
+    } catch (err) {
+      state.shareSubmitting = false;
+      state.shareFormError = err.message || "나눔글을 올리지 못했어요.";
+      render();
+    }
   }
 
   function submitDispose() {

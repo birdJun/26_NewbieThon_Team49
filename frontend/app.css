@@ -166,6 +166,35 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 .address-selected span { color: var(--ink-3); font-size: 11px; }
 .address-selected .btn { flex: none; }
 
+/* ── 동네 나눔 ─────────────────────────────────────────── */
+.share-screen { gap: 15px; }
+.share-heading { display: grid; gap: 8px; }
+.share-heading h1 { margin: 0; font-size: 23px; letter-spacing: -.03em; }
+.share-location { display: flex; align-items: center; gap: 5px; width: fit-content; max-width: 100%;
+  padding: 0; background: none; color: var(--ink-2); font-size: 12.5px; text-align: left; }
+.share-location span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-location svg { flex: none; color: var(--pine); }
+.share-search { display: flex; align-items: center; gap: 9px; min-height: 46px; padding: 0 13px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-3); }
+.share-search input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 14px; }
+.share-toolbar { display: flex; align-items: center; justify-content: space-between; color: var(--ink-3); font-size: 12px; }
+.share-toolbar strong { color: var(--ink); font-weight: 600; }
+.share-toolbar select { border: 0; outline: 0; background: transparent; color: var(--ink-2); font: inherit; font-weight: 600; }
+.share-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 10px; align-content: start; }
+.share-item { min-width: 0; }
+.share-photo { position: relative; display: grid; aspect-ratio: 1 / .83; place-items: center; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); color: var(--ink-3); }
+.share-photo img { width: 100%; height: 100%; object-fit: cover; }
+.share-status { position: absolute; left: 7px; bottom: 7px; padding: 3px 7px; border-radius: 999px; background: rgba(15, 71, 53, .88); color: #fff; font-size: 10px; font-weight: 600; }
+.share-status.held { background: rgba(157, 99, 8, .9); }
+.share-status.done { background: rgba(68, 82, 74, .88); }
+.share-item-info { display: grid; gap: 3px; padding: 8px 2px 0; }
+.share-item-info h3 { overflow: hidden; margin: 0; font-size: 13.5px; font-weight: 600; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.share-item-info p { overflow: hidden; margin: 0; color: var(--ink-3); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.share-item-info strong { font-size: 12px; color: var(--pine); }
+.share-loading { grid-column: 1 / -1; display: grid; justify-items: center; gap: 10px; padding: 44px 0; color: var(--ink-3); font-size: 13px; }
+.text-btn { margin-top: 5px; padding: 0; background: none; color: var(--pine); font-size: 12px; font-weight: 600; text-decoration: underline; }
+
 /* ── 진입 액션 ─────────────────────────────────────────── */
 .actions { display: grid; gap: 10px; }
 .action {
