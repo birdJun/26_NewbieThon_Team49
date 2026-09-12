@@ -85,10 +85,12 @@
       + t("share", "나눔", I.gift) + t("me", "내 기록", I.user) + '</nav>';
   }
 
-  const regionBar = () =>
-    '<button class="region" data-act="sheet" data-sheet="region">' + I.pin(17)
-    + '<span>' + esc(state.region.sido) + " " + esc(state.region.sigungu) + '</span>'
-    + '<span class="chev">' + I.chevD(17) + '</span></button>';
+  const regionBar = () => {
+    const address = (state.profile && state.profile.addr) || (state.region.sido + " " + state.region.sigungu);
+    return '<button class="region" data-act="change-address" title="집 주소 변경">' + I.home(17)
+      + '<span class="region-address">' + esc(address) + '</span>'
+      + '<span class="region-change">변경</span>' + I.chevR(16) + '</button>';
+  };
 
   const sampleNotice = () => window.BIUM_FEES_SAMPLE
     ? '<div class="notice sample">' + I.info(15)
@@ -135,11 +137,18 @@
 
   screens.address = function () {
     const d = state.draftProfile;
-    return '<main class="screen" style="padding-top:42px;gap:22px"><div style="display:grid;gap:7px"><span class="eyebrow" style="color:var(--pine)">내 동네 설정</span>'
+    const selectedAddress = d.roadAddress || d.addr || "";
+    const selected = selectedAddress
+      ? '<div class="field"><label>검색된 주소</label><div class="address-selected"><div><strong>' + esc(selectedAddress) + '</strong>'
+        + (d.zonecode ? '<span>' + esc(d.zonecode) + '</span>' : '') + '</div><button class="btn ghost small" data-act="search-address">다시 검색</button></div></div>'
+        + '<div class="field"><label for="home-address-detail">상세 주소 <span style="font-weight:400;color:var(--ink-3)">(선택)</span></label>'
+        + '<input id="home-address-detail" autocomplete="address-line2" enterkeyhint="done" placeholder="예) 101동 1203호" value="' + esc(d.detailAddress || '') + '"></div>'
+      : '<div class="field"><label>집 주소</label><button class="address-search" data-act="search-address">' + I.search(18)
+        + '<span><strong>주소 검색</strong><small>도로명, 건물명 또는 지번으로 찾기</small></span>' + I.chevR(17) + '</button></div>';
+    return (state.addressEdit ? topbar("집 주소 변경") : '') + '<main class="screen" style="padding-top:' + (state.addressEdit ? '18px' : '42px') + ';gap:22px"><div style="display:grid;gap:7px"><span class="eyebrow" style="color:var(--pine)">내 동네 설정</span>'
       + '<h2 class="title">집 주소를 등록해주세요</h2><p class="lede">입력한 주소는 내 배출 기록과 동네 기준을 설정할 때만 사용해요.</p></div>'
-      + '<div class="field"><label for="home-address">집 주소</label><input id="home-address" autocomplete="street-address" enterkeyhint="done" placeholder="예) 서울 관악구 신림로 12길 34" value="' + esc(d.addr || '') + '">'
-      + '<p class="help">도로명 또는 지번 주소를 입력할 수 있어요.</p></div>'
-      + '<div class="notice"><span>' + I.pin(15) + '</span><span>주소에서 구·군을 확인해 해당 지역 수수료 기준을 자동으로 적용합니다.</span></div>'
+      + selected
+      + '<div class="notice"><span>' + I.pin(15) + '</span><span>검색한 주소의 구·군을 확인해 해당 지역 수수료 기준을 자동으로 적용합니다.</span></div>'
       + (state.addressError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.addressError) + '</span></div>' : '')
       + '<div style="flex:1"></div><button class="btn" data-act="save-address">내 주소로 계속하기</button></main>';
   };
@@ -509,6 +518,7 @@
   }
 
   function back() {
+    if (state.screen === "address" && state.addressEdit) state.addressEdit = false;
     state.screen = state.stack.pop() || "home";
     render();
   }
@@ -604,21 +614,64 @@
     return matches.find(r => address.includes(r.sido)) || (matches.length === 1 ? matches[0] : null);
   }
 
-  function saveHomeAddress() {
-    const field = document.getElementById("home-address");
-    const address = field && field.value.trim();
-    if (!address) {
-      state.addressError = "집 주소를 입력해주세요."; render(); return;
+  function regionFromPostcode(data) {
+    const exact = L.regions().find(r => r.sido === data.sido && r.sigungu === data.sigungu);
+    return exact || regionFromAddress([data.sido, data.sigungu, data.roadAddress, data.jibunAddress].join(" "));
+  }
+
+  function searchHomeAddress() {
+    if (!window.kakao || !window.kakao.Postcode) {
+      state.addressError = "주소 검색 서비스를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.";
+      render();
+      return;
     }
-    const region = regionFromAddress(address);
+    new window.kakao.Postcode({
+      oncomplete: function (data) {
+        const base = data.userSelectedType === "R" ? data.roadAddress : data.jibunAddress;
+        const region = regionFromPostcode(data);
+        state.draftProfile.roadAddress = base || data.address;
+        state.draftProfile.addr = state.draftProfile.roadAddress;
+        state.draftProfile.detailAddress = "";
+        state.draftProfile.zonecode = data.zonecode || "";
+        state.draftProfile.sido = region ? region.sido : "";
+        state.draftProfile.sigungu = region ? region.sigungu : "";
+        state.addressError = region ? "" : "선택한 주소의 수수료 데이터는 아직 준비 중이에요. 추후 지원 지역을 넓혀갈게요.";
+        render();
+        requestAnimationFrame(function () {
+          const detail = document.getElementById("home-address-detail");
+          if (detail) detail.focus();
+        });
+      }
+    }).open();
+  }
+
+  function saveHomeAddress() {
+    const d = state.draftProfile;
+    const base = (d.roadAddress || d.addr || "").trim();
+    const detail = ((document.getElementById("home-address-detail") || {}).value || "").trim();
+    if (!base) {
+      state.addressError = "주소 검색으로 집 주소를 선택해주세요."; render(); return;
+    }
+    const region = d.sigungu ? { sido: d.sido, sigungu: d.sigungu } : regionFromAddress(base);
     if (!region) {
-      state.addressError = "입력한 주소의 수수료 데이터는 아직 준비 중이에요. 지원 지역을 확인한 뒤 다시 시도해주세요.";
+      state.addressError = "선택한 주소의 수수료 데이터는 아직 준비 중이에요. 추후 지원 지역을 넓혀갈게요.";
       render(); return;
     }
-    state.draftProfile.addr = address;
-    state.draftProfile.sido = region.sido;
-    state.draftProfile.sigungu = region.sigungu;
+    const address = [base, detail].filter(Boolean).join(" ");
+    d.addr = address;
+    d.sido = region.sido;
+    d.sigungu = region.sigungu;
     state.addressError = "";
+    if (state.addressEdit && state.profile) {
+      state.profile = S.saveProfile(Object.assign({}, state.profile, { addr: address, sido: region.sido, sigungu: region.sigungu, at: Date.now() }));
+      state.region = region;
+      S.setRegion(region);
+      state.addressEdit = false;
+      state.stack = [];
+      state.screen = "home";
+      render();
+      return;
+    }
     state.screen = "onboarding";
     render();
   }
@@ -647,6 +700,13 @@
         else { S.setSeenIntro(); state.screen = "address"; render(); }
         break;
       case "save-address": saveHomeAddress(); break;
+      case "search-address": searchHomeAddress(); break;
+      case "change-address":
+        state.draftProfile = Object.assign({}, state.profile || {}, { roadAddress: (state.profile || {}).addr || "", detailAddress: "" });
+        state.addressError = "";
+        state.addressEdit = true;
+        go("address");
+        break;
 
       case "ob-region":
         state.draftProfile.sido = el.dataset.sido;
