@@ -9,3 +9,5 @@ bcrypt
 PyJWT
 APScheduler
 python-dotenv
+pytest
+httpx2
