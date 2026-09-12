@@ -181,7 +181,7 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 .share-toolbar strong { color: var(--ink); font-weight: 600; }
 .share-toolbar select { border: 0; outline: 0; background: transparent; color: var(--ink-2); font: inherit; font-weight: 600; }
 .share-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 10px; align-content: start; }
-.share-item { min-width: 0; }
+.share-item { min-width: 0; text-align: left; }
 .share-photo { position: relative; display: grid; aspect-ratio: 1 / .83; place-items: center; overflow: hidden;
   border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); color: var(--ink-3); }
 .share-photo img { width: 100%; height: 100%; object-fit: cover; }
@@ -194,6 +194,33 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 .share-item-info strong { font-size: 12px; color: var(--pine); }
 .share-loading { grid-column: 1 / -1; display: grid; justify-items: center; gap: 10px; padding: 44px 0; color: var(--ink-3); font-size: 13px; }
 .text-btn { margin-top: 5px; padding: 0; background: none; color: var(--pine); font-size: 12px; font-weight: 600; text-decoration: underline; }
+.share-detail { gap: 18px; }
+.share-detail-photo { display: grid; place-items: center; width: 100%; aspect-ratio: 1 / .78; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); color: var(--ink-3); }
+.share-detail-photo img { width: 100%; height: 100%; object-fit: cover; }
+.share-description { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.7; white-space: normal; }
+.share-deadline { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--share); font-size: 12px; font-weight: 600; }
+.share-badge { display: inline-flex; width: fit-content; padding: 3px 7px; border-radius: 999px; background: var(--pine-wash); color: var(--pine); font-size: 10.5px; font-weight: 600; }
+.share-badge.held { background: var(--share-wash); color: var(--share); }
+.share-badge.done { background: var(--surface-2); color: var(--ink-3); }
+.share-owner-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.photo-edit-preview { display: grid; width: 100%; aspect-ratio: 1 / .65; place-items: center; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); color: var(--ink-3); }
+.photo-edit-preview img { width: 100%; height: 100%; object-fit: cover; }
+.activity-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.activity-summary > div { display: grid; gap: 3px; padding: 13px 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.activity-summary span { color: var(--ink-3); font-size: 11px; }
+.activity-summary strong { font-size: 20px; letter-spacing: -.03em; }
+.my-share-card { align-items: center; }
+.home-share-loading { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 74px; color: var(--ink-3); font-size: 12.5px; }
+.photo-upload-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.photo-upload { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 58px; padding: 10px;
+  border: 1px dashed var(--line-2); border-radius: 11px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.photo-upload > span:first-child { display: grid; width: 31px; height: 31px; flex: none; place-items: center; border-radius: 9px; background: var(--pine-wash); color: var(--pine); }
+.photo-upload > span:nth-child(2) { display: grid; gap: 1px; }
+.photo-upload strong { font-size: 12px; white-space: nowrap; }
+.photo-upload small { color: var(--ink-3); font-size: 10.5px; white-space: nowrap; }
+.photo-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 /* ── 진입 액션 ─────────────────────────────────────────── */
 .actions { display: grid; gap: 10px; }
@@ -348,6 +375,7 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 }
 .btn:hover { filter: brightness(1.08); }
 .btn.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); }
+.btn.danger { background: #fff1ef; color: var(--danger); border: 1px solid #f3c9c3; }
 .btn.small { padding: 9px 14px; font-size: 13px; width: auto; border-radius: 9px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
 
@@ -363,7 +391,7 @@ h3.sub   { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em;
 
 /* ── 하단 탭 ───────────────────────────────────────────── */
 .tabs {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--surface); border-top: 1px solid var(--line);
   position: sticky; bottom: 0; z-index: 20;
   padding-bottom: env(safe-area-inset-bottom, 0);

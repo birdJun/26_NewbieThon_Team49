@@ -9,6 +9,7 @@ from app.modules.core_trade.schemas import (
     ItemCreateRequest,
     ItemResponse,
     ItemStatusUpdateRequest,
+    ItemUpdateRequest,
     UserAuthRequest,
     UserResponse,
 )
@@ -110,6 +111,65 @@ async def get_item_by_id(db: AsyncSession, item_id: int) -> ItemResponse:
         detail="해당 물품을 찾을 수 없습니다.",
     )
   return ItemResponse.model_validate(item)
+
+
+# 나눔 예약 — 구매자는 AVAILABLE 상태의 다른 사람 글만 예약할 수 있다.
+async def reserve_item(
+    db: AsyncSession, item_id: int, current_user_id: int
+) -> ItemResponse:
+  result = await db.execute(select(Item).where(Item.id == item_id))
+  item = result.scalar_one_or_none()
+
+  if not item:
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="해당 물품을 찾을 수 없습니다.",
+    )
+  if item.seller_id == current_user_id:
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="내가 올린 물품은 예약할 수 없습니다.",
+    )
+  if item.status != ItemStatus.AVAILABLE:
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="이미 예약되었거나 나눔이 종료된 물품입니다.",
+    )
+
+  item.status = ItemStatus.RESERVED
+  await db.commit()
+  await db.refresh(item)
+  return ItemResponse.model_validate(item)
+
+
+
+async def update_item(
+    db: AsyncSession, item_id: int, item_in: ItemUpdateRequest, current_user_id: int
+) -> ItemResponse:
+  result = await db.execute(select(Item).where(Item.id == item_id))
+  item = result.scalar_one_or_none()
+  if not item:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="해당 물품을 찾을 수 없습니다.")
+  if item.seller_id != current_user_id:
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="물품 수정 권한이 없습니다.")
+
+  for field, value in item_in.model_dump(exclude_unset=True).items():
+    setattr(item, field, value)
+  await db.commit()
+  await db.refresh(item)
+  return ItemResponse.model_validate(item)
+
+
+async def delete_item(db: AsyncSession, item_id: int, current_user_id: int) -> None:
+  result = await db.execute(select(Item).where(Item.id == item_id))
+  item = result.scalar_one_or_none()
+  if not item:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="해당 물품을 찾을 수 없습니다.")
+  if item.seller_id != current_user_id:
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="물품 삭제 권한이 없습니다.")
+
+  await db.delete(item)
+  await db.commit()
 
 
 # 상태 변경

@@ -33,6 +33,11 @@
     shareSort: "recent",
     shareSubmitting: false,
     shareFormError: "",
+    selectedShareId: null,
+    shareActionBusy: false,
+    shareActionError: "",
+    shareEdit: null,
+    shareEditBusy: false,
     sheet: null         // 열려 있는 바텀시트 이름
   };
 
@@ -72,6 +77,7 @@
     phone: d => svg('<path d="M6.5 3.5h3l1.6 4-2 1.4a12 12 0 0 0 6 6l1.4-2 4 1.6v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z"/>', d),
     search: d => svg('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>', d),
     spark: d => svg('<path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9z"/>', d),
+    clock: d => svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.4 2"/>', d),
     box:   d => svg('<path d="M4 8.5 12 4l8 4.5V17L12 21l-8-4V8.5Z"/><path d="m4 8.5 8 4.5 8-4.5M12 13v8"/>', d)
   };
 
@@ -89,7 +95,8 @@
       '<button class="tab" role="tab" aria-selected="' + (key === active) + '" data-act="tab" data-tab="'
       + key + '">' + icon(21) + '<span>' + label + '</span></button>';
     return '<nav class="tabs" role="tablist">' + t("home", "홈", I.home)
-      + t("share", "나눔", I.gift) + t("me", "내 기록", I.user) + '</nav>';
+      + t("share", "나눔", I.gift) + t("activity", "내 나눔", I.clock)
+      + t("me", "내 정보", I.user) + '</nav>';
   }
 
   const regionBar = () => {
@@ -192,8 +199,20 @@
   };
 
   /* 1 · 홈 */
+  function homeSharePreviewHTML() {
+    if (state.shareLoading) return '<div class="home-share-loading"><span class="spinner"></span><span>나눔글을 불러오는 중이에요.</span></div>';
+    if (state.shareError) return '<div class="notice error"><span>' + I.info(15) + '</span><span>나눔글을 불러오지 못했어요. <button class="text-btn" data-act="reload-share">다시 시도</button></span></div>';
+    const list = state.shareItems.filter(item => item.status === "AVAILABLE").slice(0, 2);
+    if (!list.length) return '<p class="empty" style="padding:20px">아직 올라온 나눔이 없습니다.</p>';
+    return list.map(function (item) {
+      return '<button class="card home-share-card" data-act="open-share" data-item-id="' + item.id + '"><span class="thumb">'
+        + (item.imageUrl ? '<img src="' + esc(item.imageUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">' : I.box(24))
+        + '</span><span class="body"><h4>' + esc(item.title) + '</h4><p>' + esc(item.description || "무료나눔 물건입니다.") + '</p>'
+        + '<span class="meta"><span>' + esc(item.locationName || state.region.sigungu) + '</span><span>·</span><span>' + ago(item.registeredAt) + '</span></span></span></button>';
+    }).join("");
+  }
+
   screens.home = function () {
-    const recent = S.posts().filter(p => p.status === "open").slice(0, 2);
     return topbarBrand() + '<main class="screen">'
       + regionBar()
       + '<div style="display:grid;gap:6px">'
@@ -213,8 +232,7 @@
       + '<div class="row-between"><h3 class="sub">우리 동네 나눔</h3>'
       +   '<button class="chip" data-act="tab" data-tab="share" style="border:none;background:none;color:var(--ink-3);padding:0">'
       +   '전체보기' + I.chevR(14) + '</button></div>'
-      + '<div class="list">' + (recent.length ? recent.map(postCard).join("")
-          : '<p class="empty">아직 올라온 나눔이 없습니다.</p>') + '</div>'
+      + '<div class="list">' + homeSharePreviewHTML() + '</div>'
       + '</main>' + tabs("home");
   };
 
@@ -362,7 +380,11 @@
       +   (d.photo ? '<img src="' + d.photo + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">'
                    : I.box(26)) + '</span>'
       +   '<span class="body"><h4>' + esc(item.name) + ' · ' + esc(d.spec) + '</h4>'
-      +   '<p style="color:var(--ink-3)">' + (d.photo ? "사진에서 자동으로 입력되었습니다" : "직접 고른 품목입니다") + '</p></span></div>'
+      +   '<p style="color:var(--ink-3)">' + (d.photo ? "등록할 사진이 준비되었어요" : "직접 고른 품목입니다") + '</p></span></div>'
+      + '<div class="photo-upload-row"><label class="photo-upload"><span>' + I.cam(18) + '</span><span><strong>' + (d.photo ? '사진 다시 촬영' : '사진 촬영') + '</strong><small>후면 카메라로 촬영</small></span>'
+      + '<input type="file" accept="image/*" capture="environment" data-act="share-photo"></label>'
+      + '<label class="photo-upload"><span>' + I.grid(18) + '</span><span><strong>앨범에서 고르기</strong><small>저장된 사진 선택</small></span>'
+      + '<input type="file" accept="image/*" data-act="share-photo"></label></div>'
       + '<div class="field"><label for="f-title">제목</label>'
       +   '<input id="f-title" placeholder="예) 거의 안 쓴 3인용 패브릭 소파" value="' + esc(d.title || "") + '"></div>'
       + '<div class="field"><label>상태</label><div class="chips">'
@@ -380,27 +402,26 @@
       + '</main>';
   };
 
-  /* 6 · 배출 신고필증 */
+  /* 6 · 구청 배출 신청 안내 — 결제/접수는 구청에서 진행한다. */
   screens.sticker = function () {
-    const r = state.record;
-    return topbar("신청 완료") + '<main class="screen">'
+    const r = state.disposePlan;
+    if (!r) return topbar("구청 배출 신청") + '<main class="screen"><p class="empty">배출 정보를 찾을 수 없어요.</p></main>';
+    return topbar("구청 배출 신청") + '<main class="screen">'
       + '<div style="display:grid;justify-items:center;gap:9px;padding-top:6px">'
-      +   '<span style="width:52px;height:52px;border-radius:50%;background:var(--pine-wash);color:var(--pine);'
-      +   'display:grid;place-items:center">' + I.check(27) + '</span>'
-      +   '<h2 class="title" style="text-align:center">배출 신청이 접수되었습니다</h2></div>'
-      + '<div class="sticker">'
-      +   '<div class="stamp"><b>대형폐기물 배출신고필증</b><span>' + esc(r.org || state.region.sigungu + "청") + '</span></div>'
-      +   '<div class="no">' + esc(r.no) + '</div><div class="no-label">배 출 번 호</div>'
+      +   '<span style="width:52px;height:52px;border-radius:50%;background:var(--dispose-wash);color:var(--dispose);'
+      +   'display:grid;place-items:center">' + I.truck(27) + '</span>'
+      +   '<h2 class="title" style="text-align:center">구청에서 신청을 이어가세요</h2><p class="lede" style="text-align:center">아직 결제나 배출 접수는 완료되지 않았어요.</p></div>'
+      + '<div class="sticker dispose-guide">'
+      +   '<div class="stamp"><b>대형폐기물 배출 안내</b><span>' + esc(r.org || state.region.sigungu + "청") + '</span></div>'
       +   '<dl><dt>품목</dt><dd>' + esc(r.itemName) + '</dd>'
       +   '<dt>규격</dt><dd>' + esc(r.spec) + '</dd>'
-      +   '<dt>수수료</dt><dd class="mono">' + won(r.fee) + '</dd>'
-      +   '<dt>배출일</dt><dd class="mono">' + esc(r.date) + '</dd>'
-      +   '<dt>배출장소</dt><dd>집 앞 또는 지정 배출장소</dd></dl></div>'
+      +   '<dt>예상 수수료</dt><dd class="mono">' + won(r.fee) + '</dd>'
+      +   '<dt>배출장소</dt><dd>구청 안내에 따라 지정</dd></dl></div>'
       + '<div class="notice sample">' + I.info(15)
-      +   '<span><strong>배출번호를 종이에 적어 물건에 붙여주세요.</strong> 번호가 없으면 수거되지 않습니다.</span></div>'
+      +   '<span><strong>구청 페이지에서 품목·수수료를 다시 확인하고 결제해야 합니다.</strong><br>접수번호를 받은 뒤 지정 장소와 날짜에 배출해 주세요.</span></div>'
       + '<div style="flex:1"></div>'
-      // TODO(팀원 누구든): 신고필증을 이미지로 저장하는 기능. canvas 로 그려서 내려받게 하면 된다.
-      + '<button class="btn ghost" data-act="tab" data-tab="me">내 기록에서 다시 보기</button>'
+      + '<a class="btn" href="' + esc(municipalDisposalUrl(state.region)) + '" target="_blank" rel="noopener">구청 배출 신청 페이지 열기</a>'
+      + '<button class="btn ghost" data-act="tab" data-tab="home">홈으로 돌아가기</button>'
       + '</main>';
   };
 
@@ -461,11 +482,11 @@
     if (!list.length) return '<p class="empty">' + (state.shareQuery ? '검색 결과가 없어요.' : '아직 올라온 나눔이 없습니다.<br>첫 나눔을 올려보세요!') + '</p>';
     return list.map(function (item) {
       const status = shareStatus(item);
-      return '<article class="share-item" data-share-card><div class="share-photo">'
+      return '<button class="share-item" data-act="open-share" data-item-id="' + item.id + '"><div class="share-photo">'
         + (item.imageUrl ? '<img src="' + esc(item.imageUrl) + '" alt="' + esc(item.title) + '">' : '<span>' + I.box(34) + '</span>')
         + '<span class="share-status ' + status[1] + '">' + status[0] + '</span></div>'
         + '<div class="share-item-info"><h3>' + esc(item.title) + '</h3><p>' + esc(item.locationName || state.region.sigungu) + ' · ' + ago(item.registeredAt) + '</p>'
-        + '<strong>무료나눔</strong></div></article>';
+        + '<strong>무료나눔</strong></div></button>';
     }).join("");
   }
 
@@ -489,6 +510,93 @@
       + '<div class="share-grid" id="share-grid">' + shareGridHTML() + '</div></main>' + tabs("share");
   };
 
+  function selectedShare() {
+    return state.shareItems.find(item => String(item.id) === String(state.selectedShareId)) || null;
+  }
+
+  function isMyShare(item) {
+    const auth = S.auth() || {};
+    return Number(item.sellerId) === Number(auth.id);
+  }
+
+  function shareDaysLeft(item) {
+    if (item.status === "EXPIRED_UNMATCHED") return "미매칭 기간 종료";
+    const days = Math.max(0, Math.ceil((item.expiresAt - Date.now()) / 86400000));
+    return days ? "나눔 마감까지 " + days + "일" : "오늘 마감";
+  }
+
+  screens.shareDetail = function () {
+    const item = selectedShare();
+    if (!item) return topbar("나눔 상세") + '<main class="screen"><p class="empty">나눔글을 찾을 수 없어요.</p></main>' + tabs("share");
+    const status = shareStatus(item);
+    const mine = isMyShare(item);
+    let action = '<div class="notice"><span>' + I.info(15) + '</span><span>나눔 장소와 시간은 상대방과 확인해 주세요.</span></div>';
+    if (item.status === "AVAILABLE" && !mine) {
+      action += '<button class="btn" data-act="reserve-share"' + (state.shareActionBusy ? ' disabled' : '') + '>'
+        + (state.shareActionBusy ? '예약하는 중...' : '가져갈게요') + '</button>';
+    } else if (item.status === "RESERVED" && mine) {
+      action += '<button class="btn" data-act="complete-share"' + (state.shareActionBusy ? ' disabled' : '') + '>'
+        + (state.shareActionBusy ? '처리 중...' : '나눔 완료로 표시') + '</button>';
+    } else if (!mine) {
+      action += '<button class="btn ghost" disabled>' + status[0] + '</button>';
+    }
+    if (mine) {
+      action += '<div class="share-owner-actions"><button class="btn ghost" data-act="edit-share">수정</button>'
+        + '<button class="btn danger" data-act="delete-share">삭제</button></div>';
+    }
+    return topbar("나눔 상세") + '<main class="screen share-detail">'
+      + '<div class="share-detail-photo">' + (item.imageUrl ? '<img src="' + esc(item.imageUrl) + '" alt="' + esc(item.title) + '">' : I.box(52)) + '</div>'
+      + '<div style="display:grid;gap:6px"><div class="row-between"><h2 class="title">' + esc(item.title) + '</h2>'
+      + '<span class="badge share-badge ' + status[1] + '">' + status[0] + '</span></div>'
+      + '<p class="lede">' + esc(item.locationName || state.region.sigungu) + ' · ' + ago(item.registeredAt) + '</p>'
+      + '<p class="share-deadline">' + I.clock(14) + shareDaysLeft(item) + '</p></div>'
+      + '<div class="divider"></div><p class="share-description">' + esc(item.description || "등록된 설명이 없어요.").replace(/\n/g, "<br>") + '</p>'
+      + (state.shareActionError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.shareActionError) + '</span></div>' : '')
+      + '<div style="flex:1"></div>' + action + '</main>' + tabs("share");
+  };
+
+  screens.shareEdit = function () {
+    const d = state.shareEdit;
+    if (!d) return topbar("나눔글 수정") + '<main class="screen"><p class="empty">수정할 나눔글을 찾을 수 없어요.</p></main>';
+    return topbar("나눔글 수정") + '<main class="screen">'
+      + '<div class="photo-edit-preview">' + (d.imageUrl ? '<img src="' + esc(d.imageUrl) + '" alt="나눔 물건 사진">' : I.box(36)) + '</div>'
+      + '<div class="photo-upload-row"><label class="photo-upload"><span>' + I.cam(18) + '</span><span><strong>사진 다시 촬영</strong><small>후면 카메라로 촬영</small></span>'
+      + '<input type="file" accept="image/*" capture="environment" data-act="share-edit-photo"></label>'
+      + '<label class="photo-upload"><span>' + I.grid(18) + '</span><span><strong>앨범에서 고르기</strong><small>저장된 사진 선택</small></span>'
+      + '<input type="file" accept="image/*" data-act="share-edit-photo"></label></div>'
+      + '<div class="field"><label for="edit-title">제목</label><input id="edit-title" value="' + esc(d.title) + '"></div>'
+      + '<div class="field"><label for="edit-desc">설명</label><textarea id="edit-desc">' + esc(d.description) + '</textarea></div>'
+      + '<div class="field"><label for="edit-location">받아 가실 곳</label><input id="edit-location" value="' + esc(d.locationName) + '"></div>'
+      + (state.shareActionError ? '<div class="notice error">' + I.info(15) + '<span>' + esc(state.shareActionError) + '</span></div>' : '')
+      + '<div style="flex:1"></div><button class="btn" data-act="save-share-edit"' + (state.shareEditBusy ? ' disabled' : '') + '>'
+      + (state.shareEditBusy ? '저장 중...' : '수정 저장하기') + '</button></main>';
+  };
+
+  function myShareListHTML() {
+    if (state.shareLoading) return '<div class="share-loading"><span class="spinner"></span><span>내 나눔글을 불러오는 중이에요.</span></div>';
+    if (state.shareError) return '<div class="notice error"><span>' + I.info(15) + '</span><span>' + esc(state.shareError) + '</span></div>';
+    const mine = state.shareItems.filter(isMyShare).sort((a, b) => b.registeredAt - a.registeredAt);
+    if (!mine.length) return '<p class="empty">아직 올린 나눔글이 없어요.</p>';
+    return '<div class="list">' + mine.map(function (item) {
+      const status = shareStatus(item);
+      return '<button class="card my-share-card" data-act="open-share" data-item-id="' + item.id + '"><span class="thumb">'
+        + (item.imageUrl ? '<img src="' + esc(item.imageUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">' : I.box(24))
+        + '</span><span class="body"><h4>' + esc(item.title) + '</h4><p>' + shareDaysLeft(item) + '</p><span class="meta">'
+        + '<span class="badge share-badge ' + status[1] + '">' + status[0] + '</span></span></span></button>';
+    }).join("") + '</div>';
+  }
+
+  screens.myShares = function () {
+    const mine = state.shareItems.filter(isMyShare);
+    const unmatched = mine.filter(item => item.status === "AVAILABLE");
+    const expired = mine.filter(item => item.status === "EXPIRED_UNMATCHED" || item.status === "DISPOSAL_PENDING");
+    return '<header class="topbar"><h1>내 나눔</h1></header><main class="screen">'
+      + '<div class="activity-summary"><div><span>나눔중</span><strong>' + unmatched.length + '</strong></div><div><span>배출 전환</span><strong>' + expired.length + '</strong></div><div><span>전체</span><strong>' + mine.length + '</strong></div></div>'
+      + '<div class="notice"><span>' + I.clock(15) + '</span><span>나눔글은 등록 후 7일 동안 매칭을 기다려요. 기간이 지나면 배출 방법을 안내해 드립니다.</span></div>'
+      + '<div style="display:grid;gap:9px"><h3 class="sub">내가 올린 나눔</h3>' + myShareListHTML() + '</div>'
+      + '</main>' + tabs("activity");
+  };
+
   const STATUS = { open: ["나눔중", "var(--pine)", "var(--pine-wash)"],
                    held: ["예약됨", "var(--share)", "var(--share-wash)"],
                    done: ["나눔 완료", "var(--ink-3)", "var(--surface-2)"] };
@@ -506,29 +614,22 @@
 
   /* 9 · 내 기록 */
   screens.me = function () {
-    const recs = S.records();
-    const mine = S.posts().filter(p => !p.seed);
     const pr = state.profile || {};
-    return '<header class="topbar"><h1>내 기록</h1></header><main class="screen">'
+    return '<header class="topbar"><h1>내 정보</h1></header><main class="screen">'
       + '<div class="card" style="align-items:center;padding:14px">'
       +   '<span class="thumb" style="border-radius:50%;background:var(--pine-wash);color:var(--pine)">'
       +   I.user(24) + '</span>'
       +   '<span class="body"><h4>' + esc(pr.nickname || "게스트") + '</h4>'
       +   '<p>' + esc(pr.sido || "") + ' ' + esc(pr.sigungu || "") + (pr.addr ? " · " + esc(pr.addr) : "") + '</p></span>'
-      +   '<button class="btn ghost small" data-act="logout">로그아웃</button>'
       + '</div>'
-      + '<div style="display:grid;gap:9px"><h3 class="sub">배출 신청</h3>'
-      + (recs.length ? '<div class="list">' + recs.map(r =>
-          '<div class="card"><span class="thumb mono" style="font-size:11px;flex-direction:column">'
-          + esc(r.no.split("-")[1]) + '</span><span class="body"><h4>' + esc(r.itemName) + ' · ' + esc(r.spec) + '</h4>'
-          + '<p>' + esc(r.date) + ' 배출 · ' + won(r.fee) + '</p>'
-          + '<span class="meta"><span>배출번호 ' + esc(r.no) + '</span></span></span></div>').join("") + '</div>'
-        : '<p class="empty">아직 신청한 배출이 없습니다.</p>') + '</div>'
+      + '<button class="btn ghost" data-act="change-address">집 주소 변경</button>'
       + '<div class="divider"></div>'
-      + '<div style="display:grid;gap:9px"><h3 class="sub">내가 올린 나눔</h3>'
-      + (mine.length ? '<div class="list">' + mine.map(postCard).join("") + '</div>'
-        : '<p class="empty">아직 올린 나눔이 없습니다.</p>') + '</div>'
-      + '<div class="notice"><span>' + I.info(15) + '</span><span><strong>데이터 저장 안내</strong><br>주소·나눔글·배출 기록은 현재 이 기기의 브라우저에 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우면 복원되지 않습니다.</span></div>'
+      + '<div style="display:grid;gap:8px"><h3 class="sub">배출 신청 안내</h3>'
+      + '<div class="notice"><span>' + I.info(15) + '</span><span>비움은 수수료와 배출 방법을 안내해 드려요. 실제 신청과 결제는 관할 구청 페이지에서 진행됩니다.</span></div>'
+      + '</div>'
+      + '<div class="notice"><span>' + I.clock(15) + '</span><span>내가 올린 나눔글과 미매칭 기간은 <strong>내 나눔</strong> 탭에서 확인할 수 있어요.</span></div>'
+      + '<div style="flex:1"></div>'
+      + '<button class="btn ghost" data-act="logout">로그아웃</button>'
       + '</main>' + tabs("me");
   };
 
@@ -582,12 +683,12 @@
   async function loadShareItems() {
     state.shareLoading = true;
     state.shareError = "";
-    if (state.screen === "shareList") render();
+    if (["home", "shareList", "shareDetail", "myShares"].includes(state.screen)) render();
     try {
       const items = await api("/items?limit=100");
       state.shareItems = items.map(function (item) {
         return {
-          id: item.id, title: item.title, description: item.description || "", imageUrl: item.image_url,
+          id: item.id, sellerId: item.seller_id, title: item.title, description: item.description || "", imageUrl: item.image_url,
           locationName: item.location_name || "", status: item.status,
           registeredAt: new Date(item.registered_at).getTime(), expiresAt: new Date(item.expires_at).getTime()
         };
@@ -596,7 +697,93 @@
       state.shareError = err.message || "나눔글을 불러오지 못했어요.";
     } finally {
       state.shareLoading = false;
-      if (state.screen === "shareList") render();
+      if (["home", "shareList", "shareDetail", "myShares"].includes(state.screen)) render();
+    }
+  }
+
+  async function updateShareStatus(status) {
+    const item = selectedShare();
+    if (!item || state.shareActionBusy) return;
+    state.shareActionBusy = true;
+    state.shareActionError = "";
+    render();
+    try {
+      if (status === "RESERVED") {
+        await api("/items/" + item.id + "/reserve", { method: "POST", headers: authHeaders() });
+      } else {
+        await api("/items/" + item.id + "/status", {
+          method: "PATCH", headers: authHeaders(), body: JSON.stringify({ status: status })
+        });
+      }
+      await loadShareItems();
+    } catch (err) {
+      state.shareActionBusy = false;
+      state.shareActionError = err.message || "상태를 변경하지 못했어요.";
+      render();
+      return;
+    }
+    state.shareActionBusy = false;
+    render();
+  }
+
+  function beginShareEdit() {
+    const item = selectedShare();
+    if (!item || !isMyShare(item)) return;
+    state.shareActionError = "";
+    state.shareEdit = Object.assign({}, item);
+    go("shareEdit");
+  }
+
+  async function saveShareEdit() {
+    const d = state.shareEdit;
+    if (!d || state.shareEditBusy) return;
+    const title = ((document.getElementById("edit-title") || {}).value || "").trim();
+    const description = ((document.getElementById("edit-desc") || {}).value || "").trim();
+    const locationName = ((document.getElementById("edit-location") || {}).value || "").trim();
+    if (title.length < 2) {
+      state.shareActionError = "제목은 두 글자 이상 입력해주세요.";
+      render();
+      return;
+    }
+    d.title = title; d.description = description; d.locationName = locationName;
+    state.shareEditBusy = true;
+    state.shareActionError = "";
+    render();
+    try {
+      await api("/items/" + d.id, {
+        method: "PATCH", headers: authHeaders(), body: JSON.stringify({
+          title: title, description: description || "나눔할 물건입니다.",
+          image_url: d.imageUrl || null, location_name: locationName || null
+        })
+      });
+      state.shareEditBusy = false;
+      state.shareEdit = null;
+      state.screen = "shareDetail";
+      await loadShareItems();
+    } catch (err) {
+      state.shareEditBusy = false;
+      state.shareActionError = err.message || "나눔글을 수정하지 못했어요.";
+      render();
+    }
+  }
+
+  async function deleteShare() {
+    const item = selectedShare();
+    if (!item || !isMyShare(item) || state.shareActionBusy) return;
+    if (!confirm("이 나눔글을 삭제할까요?")) return;
+    state.shareActionBusy = true;
+    state.shareActionError = "";
+    render();
+    try {
+      await api("/items/" + item.id, { method: "DELETE", headers: authHeaders() });
+      state.selectedShareId = null;
+      state.shareActionBusy = false;
+      state.screen = "myShares";
+      await loadShareItems();
+    } catch (err) {
+      state.shareActionBusy = false;
+      state.shareActionError = err.message || "나눔글을 삭제하지 못했어요.";
+      render();
     }
   }
 
@@ -676,6 +863,7 @@
       state.screen = S.hasSeenIntro() ? "address" : "intro";
     }
     render();
+    if (state.screen === "home") loadShareItems();
   }
 
   function regionFromAddress(address) {
@@ -784,6 +972,16 @@
         render(); break;
       case "ob-submit": submitOnboarding(); break;
       case "reload-share": loadShareItems(); break;
+      case "open-share":
+        state.selectedShareId = el.dataset.itemId;
+        state.shareActionError = "";
+        go("shareDetail");
+        break;
+      case "reserve-share": updateShareStatus("RESERVED"); break;
+      case "complete-share": updateShareStatus("COMPLETED"); break;
+      case "edit-share": beginShareEdit(); break;
+      case "save-share-edit": saveShareEdit(); break;
+      case "delete-share": deleteShare(); break;
       case "logout":
         if (!confirm("로그아웃할까요? 이 기기에 저장된 닉네임이 지워집니다.")) return;
         S.logout();
@@ -791,9 +989,9 @@
         state.screen = "login"; render(); break;
       case "tab":
         state.stack = [];
-        state.screen = { home: "home", share: "shareList", me: "me" }[el.dataset.tab];
+        state.screen = { home: "home", share: "shareList", activity: "myShares", me: "me" }[el.dataset.tab];
         render();
-        if (state.screen === "shareList") loadShareItems();
+        if (state.screen === "home" || state.screen === "shareList" || state.screen === "myShares") loadShareItems();
         break;
 
       case "sheet":       state.sheet = el.dataset.sheet; render(); break;
@@ -851,6 +1049,25 @@
     if (e.target.dataset.act === "share-sort") {
       state.shareSort = e.target.value;
       updateShareGrid();
+      return;
+    }
+    if (e.target.dataset.act === "share-photo" || e.target.dataset.act === "share-edit-photo") {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const shrunk = await window.BiumAI.downscale(file);
+        if (e.target.dataset.act === "share-edit-photo" && state.shareEdit) {
+          state.shareEdit.imageUrl = shrunk.dataUrl;
+          state.shareActionError = "";
+        } else {
+          state.draft.photo = shrunk.dataUrl;
+          state.shareFormError = "";
+        }
+      } catch (err) {
+        if (e.target.dataset.act === "share-edit-photo") state.shareActionError = err.message || "사진을 불러오지 못했어요.";
+        else state.shareFormError = err.message || "사진을 불러오지 못했어요.";
+      }
+      render();
       return;
     }
     if (e.target.dataset.act !== "photo") return;
@@ -935,16 +1152,16 @@
     const p = L.paths(state.region, item, d.spec);
     if (p.dispose.unknown) { alert("이 지역 수수료 데이터에 이 품목이 없습니다. 구청에 직접 확인해 주세요."); return; }
 
-    // TODO(팀원 누구든): 지금은 이틀 뒤로 고정. 구청별 수거 요일을 반영하면 더 정확해진다.
-    const dt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 2);
-    const date = dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-"
-      + String(dt.getDate()).padStart(2, "0") + " (" + "일월화수목금토"[dt.getDay()] + ")";
-
-    state.record = S.addRecord({ itemId: d.itemId, itemName: item.name, spec: p.dispose.spec,
-      fee: p.dispose.fee, org: p.dispose.org, date: date, no: S.issueNumber(),
-      sido: state.region.sido, sigungu: state.region.sigungu });
+    state.disposePlan = { itemId: d.itemId, itemName: item.name, spec: p.dispose.spec,
+      fee: p.dispose.fee, org: p.dispose.org, sido: state.region.sido, sigungu: state.region.sigungu };
 
     go("sticker");
+  }
+
+  function municipalDisposalUrl(region) {
+    const known = { "관악구": "https://smartclean.gwanak.go.kr/" };
+    return known[region.sigungu] || "https://www.google.com/search?q="
+      + encodeURIComponent(region.sigungu + " 대형폐기물 배출 신청");
   }
 
   /* ── 시작 ─────────────────────────────────────────────── */

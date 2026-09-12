@@ -32,6 +32,13 @@ class ItemCreateRequest(BaseModel):
   unmatched_limit_days: int = Field(default=7, ge=1, le=30)
 
 
+class ItemUpdateRequest(BaseModel):
+  title: Optional[str] = Field(default=None, min_length=2, max_length=100)
+  description: Optional[str] = None
+  image_url: Optional[str] = None
+  location_name: Optional[str] = None
+
+
 class ItemStatusUpdateRequest(BaseModel):
   status: ItemStatus
 
