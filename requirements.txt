@@ -1,0 +1,10 @@
+fastapi
+python-multipart
+uvicorn[standard]
+sqlalchemy
+greenlet
+aiosqlite
+pydantic-settings
+bcrypt
+PyJWT
+APScheduler

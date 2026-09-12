@@ -27,7 +27,11 @@ yarn-error.log*
 logs/
 *.log
 
-# Python runtime files and local uploads
 __pycache__/
 *.py[cod]
+*.db
+*.sqlite3
 backend/uploads/
+
+# 브라우저에서만 사용하는 개인 API 설정 (실제 키 포함 가능)
+frontend/config.js
