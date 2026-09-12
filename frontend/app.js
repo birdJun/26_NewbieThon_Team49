@@ -71,6 +71,15 @@
     return d === 1 ? "어제" : d + "일 전";
   }
 
+  // FastAPI/SQLite가 timezone 없는 UTC ISO 문자열을 보낼 수 있다.
+  // timezone이 없는 값을 브라우저 현지시간으로 해석하지 않도록 UTC로 명시한다.
+  function serverTimestamp(value) {
+    const raw = String(value || "");
+    const iso = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? raw : raw + "Z";
+    const parsed = Date.parse(iso);
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  }
+
   /* ── 아이콘 ───────────────────────────────────────────── */
   const svg = (d, n) => '<svg width="' + (n || 20) + '" height="' + (n || 20) + '" viewBox="0 0 24 24" '
     + 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
@@ -891,7 +900,7 @@
         return {
           id: item.id, sellerId: item.seller_id, title: item.title, description: item.description || "", imageUrl: item.image_url,
           locationName: item.location_name || "", status: item.status,
-          registeredAt: new Date(item.registered_at).getTime(), expiresAt: new Date(item.expires_at).getTime()
+          registeredAt: serverTimestamp(item.registered_at), expiresAt: serverTimestamp(item.expires_at)
         };
       });
     } catch (err) {
@@ -1489,6 +1498,8 @@
     state.stack = [];
     state.screen = "home";
     render();
+    // 온보딩 직후에도 홈의 우리 동네 나눔을 즉시 채운다.
+    loadShareItems();
   }
 
   async function submitShare() {
