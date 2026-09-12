@@ -46,6 +46,7 @@
     feeBusy: false,
     feeError: "",
     locationBusy: false,
+    composingInput: null,
     sheet: null         // 열려 있는 바텀시트 이름
   };
 
@@ -361,6 +362,21 @@
   };
 
   /* 3 · 품목 직접 고르기 */
+  function pickResultsHTML() {
+    return state.q
+      ? '<div class="item-grid">' + (L.search(state.q).map(itemBtn).join("")
+          || '<p class="empty" style="grid-column:1/-1">검색 결과가 없습니다.</p>') + '</div>'
+      : '<div class="chips">' + (window.BIUM_CATEGORIES || []).map(c =>
+          '<button class="chip" data-act="cat" data-cat="' + c.id + '" aria-pressed="'
+          + (c.id === state.cat) + '">' + esc(c.name) + '</button>').join("") + '</div>'
+        + '<div class="item-grid">' + L.itemsOf(state.cat).map(itemBtn).join("") + '</div>';
+  }
+
+  function updatePickResults() {
+    const results = document.getElementById("pick-results");
+    if (results) results.innerHTML = pickResultsHTML();
+  }
+
   screens.pick = function () {
     const d = state.draft;
     const sel = d.itemId ? L.findItem(d.itemId) : null;
@@ -369,13 +385,7 @@
     return topbar("품목 고르기") + '<main class="screen">'
       + '<div class="field"><input type="search" placeholder="품목 이름으로 검색" data-act="search" '
       +   'value="' + esc(state.q || "") + '"></div>'
-      + (state.q
-          ? '<div class="item-grid">' + (L.search(state.q).map(itemBtn).join("")
-              || '<p class="empty" style="grid-column:1/-1">검색 결과가 없습니다.</p>') + '</div>'
-          : '<div class="chips">' + (window.BIUM_CATEGORIES || []).map(c =>
-              '<button class="chip" data-act="cat" data-cat="' + c.id + '" aria-pressed="'
-              + (c.id === state.cat) + '">' + esc(c.name) + '</button>').join("") + '</div>'
-            + '<div class="item-grid">' + items.map(itemBtn).join("") + '</div>')
+        + '<div id="pick-results">' + pickResultsHTML() + '</div>'
       + (sel ? '<div class="divider"></div>'
           + '<div style="display:grid;gap:9px"><h3 class="sub">' + esc(sel.name) + ' — 규격을 골라주세요</h3>'
           + '<div class="chips">' + sel.specs.map(sp =>
@@ -1358,6 +1368,22 @@
     if (submit) submit.disabled = !(state.draftProfile.nickname || "").trim() || !state.draftProfile.sigungu;
   }
 
+  app.addEventListener("compositionstart", function (e) {
+    if (e.target.dataset.act === "ob-name" || e.target.dataset.act === "search") {
+      state.composingInput = e.target.dataset.act;
+    }
+  });
+
+  app.addEventListener("compositionend", function (e) {
+    const key = e.target.dataset.act;
+    if (key !== "ob-name" && key !== "search") return;
+    state.composingInput = null;
+    if (key === "ob-name") state.draftProfile.nickname = e.target.value;
+    else state.q = e.target.value.trim();
+    if (key === "ob-name") render();
+    else updatePickResults();
+  });
+
   app.addEventListener("input", function (e) {
     if (e.target.dataset.act === "info-fee-query") {
       state.infoFeeQuery = e.target.value;
@@ -1384,10 +1410,8 @@
     if (e.target.dataset.act === "search") {
       const key = e.target.dataset.act;
       state.q = e.target.value.trim();
-      const pos = e.target.selectionStart;
-      render();
-      const next = app.querySelector('[data-act="' + key + '"]');
-      if (next) { next.focus(); next.setSelectionRange(pos, pos); }
+      if (e.isComposing || state.composingInput === key) return;
+      updatePickResults();
     }
   });
 
